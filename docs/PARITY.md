@@ -1,4 +1,4 @@
-# Přenos v16.5 → v17.0
+# Přenos v16.5 → v17.1
 
 ## Výchozí zdroj
 
@@ -24,7 +24,7 @@ Kontrolní součty a seznam 76 přenesených čistých funkcí jsou v `source-pr
 
 Transport GAS/Sheets byl nahrazen HTTP a SQLite transakcemi. Původní tabulková fronta již neexistuje; clear barrier platí na dosud neprovedené příkazy přijaté dávky. Dedupe potvrzení se drží nejméně 24 h. Archiv nemá automatickou retenční očistu. Historie staré aplikace se neimportuje.
 
-Tři UI úpravy: alert touch-action pro swipe; alert viewport 10 s; reminder viewport 10 s a poté pouze karta. Verze 17.0. Při prvním otevření nového originu se místní preference z Apps Scriptu automaticky nepřenášejí.
+Tři UI úpravy: alert touch-action pro swipe; alert viewport 10 s; reminder viewport 10 s a poté pouze karta. Verze 17.1. Při prvním otevření nového originu se místní preference z Apps Scriptu automaticky nepřenášejí.
 
 ## Ověření při přípravě
 
@@ -38,3 +38,7 @@ Tři UI úpravy: alert touch-action pro swipe; alert viewport 10 s; reminder vie
 `workerd-smoke.js` ověřuje navíc lokální skutečný Workers runtime, persistentní SQLite, souběh dvou gest a restart. Výsledky tohoto CI a skutečné produkční nasazení je nutné posuzovat podle běhu GitHub/Cloudflare, ne podle tohoto seznamu.
 
 Simulované a automatické testy **nenahrazují zkoušku na kuchyňském telefonu**: fyzická baterie, zvuk, OS spořič, fullscreen a wake lock vyžadují kontrolu v cílovém prostředí. Pixelový test nepokrývá každou možnou kartu nebo animovaný snímek.
+
+## Oprava v17.1
+
+HTML explicitně deklaruje UTF-8 v dokumentu i HTTP odpovědi a normalizační regex používá ASCII escape, aby se JavaScript nerozbil při chybném autodetekování znakové sady. `workerd-smoke.js` tuto cestu regresně kontroluje.

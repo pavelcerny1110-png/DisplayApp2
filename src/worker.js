@@ -21,6 +21,10 @@ export default {
     if (!['GET', 'HEAD'].includes(request.method)) return json({ ok: false, message: 'Nepovolená HTTP metoda.' }, 405);
     const asset = await env.ASSETS.fetch(request);
     const headers = new Headers(asset.headers);
+    const contentType = String(headers.get('Content-Type') || '').toLowerCase();
+    if (url.pathname === '/' || url.pathname.endsWith('.html') || contentType.startsWith('text/html')) {
+      headers.set('Content-Type', 'text/html; charset=utf-8');
+    }
     // Updates to index.html become visible on reload, never cached by a service worker.
     headers.set('Cache-Control', 'no-cache');
     headers.set('X-Content-Type-Options', 'nosniff');

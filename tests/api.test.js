@@ -19,7 +19,7 @@ test('empty schema and defaults, GET polling does not write', () => {
   const before = db.prepare('SELECT total_changes() n').get().n;
   for (let i = 0; i < 10; i++) {
     const snap = api.snapshot();
-    assert.equal(snap.version, '17.0'); assert.equal(snap.settings.poll_seconds, 3);
+    assert.equal(snap.version, '17.1'); assert.equal(snap.settings.poll_seconds, 3);
     assert.equal(snap.syncState.manualRevision, 0); assert.deepEqual(snap.items, []);
   }
   assert.equal(db.prepare('SELECT total_changes() n').get().n, before);
@@ -197,7 +197,7 @@ test('HTTP endpoints, no-store, CORS, invalid JSON, limits and method rejection'
   res = await handleApi(request('/api/command','POST','{}', { 'Content-Type':'application/json','Content-Length':'99999999' }),api); assert.equal(res.status,413);
   res = await handleApi(request('/api/action','POST',JSON.stringify({ action:'swipe_item',item_id:'missing' }), { 'Content-Type':'application/json' }),api); assert.equal(res.status,409);
   res = await handleApi(request('/api/not-found'),api); assert.equal(res.status,404);
-  res = await handleApi(request('/api/health'),api); assert.equal((await res.json()).version,'17.0');
+  res = await handleApi(request('/api/health'),api); assert.equal((await res.json()).version,'17.1');
 });
 test('100 rapid updates receive distinct expected_updated_at tokens', () => {
   const { api } = createTestKitchen(); add(api); const times = new Set([current(api).updated_at]);

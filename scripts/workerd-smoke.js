@@ -35,10 +35,14 @@ async function request(path,body) {
 }
 try {
   await start();
-  assert.equal((await request('/api/health')).body.version,'17.0');
+  assert.equal((await request('/api/health')).body.version,'17.1');
   const document=await fetch(base+'/');
   assert.equal(document.status,200);
-  assert.match(await document.text(),/DISPLAY_APP_VERSION = '17.0'/);
+  assert.match(document.headers.get('content-type') || '', /^text\/html;\s*charset=utf-8/i);
+  const documentText=await document.text();
+  assert.match(documentText,/DISPLAY_APP_VERSION = '17.1'/);
+  assert.match(documentText,/<meta charset=\"utf-8\">/i);
+  assert.ok(documentText.includes(".replace(/[\\u0300-\\u036f]/g, '')"));
   const command={command_id:'ci-create',action:'upsert_item',payload:{item:{id:'ci-order',type:'order',title:'#1 TEST',body:'Polévka\nŘízek'}}};
   assert.equal((await request('/api/command',command)).body.ok,true);
   assert.equal((await request('/api/command',command)).body.results[0].status,'duplicate');

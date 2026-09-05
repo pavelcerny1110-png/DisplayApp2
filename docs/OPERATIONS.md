@@ -1,5 +1,9 @@
 # Provoz Display App v17.0 z ChatGPT
 
+## Aktuální verze v17.1
+
+Produkční kód je nyní v17.1. Oproti v17.0 opravuje pouze načítání frontendu na reálném telefonu: explicitní UTF-8 v HTML i HTTP hlavičce a ASCII-safe normalizační regex. Make bridge a API smlouva se nemění. Níže uvedené v17.0 live testy zůstávají historickým záznamem původního vydání.
+
 Ověřeno 5. 9. 2026. Tento dokument je provozní vodítko, nikoli náhrada aktuálního kódu nebo skutečného stavu API.
 
 ## Kam se připojit

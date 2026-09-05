@@ -54,7 +54,7 @@ try:
   browser=pw.chromium.launch(executable_path=os.environ.get('CHROMIUM','/usr/bin/chromium'),headless=True,args=['--no-sandbox'])
   command('clear_display_and_current_service_log')
   page=load(browser)
-  assert page.evaluate('DISPLAY_APP_VERSION')=='17.0'
+  assert page.evaluate('DISPLAY_APP_VERSION')=='17.1'
   record('frontend starts against native API snapshot')
   add({'id':'alert-test','type':'alert','title':'Pozor','body':'Test upozornění'})
   add({'id':'reminder-test','type':'reminder','title':'Časovač','body':'Test připomínky','data':{'remind_at':datetime.now(timezone.utc).isoformat()}})

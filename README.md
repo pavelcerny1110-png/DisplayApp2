@@ -1,4 +1,4 @@
-# Display App v17.0
+# Display App v17.1
 
 Kuchyňský displej pro **ChatGPT**, samostatně provozovaný na Cloudflare.
 
@@ -20,6 +20,7 @@ Po nasazení otevřete adresu Workeru na kuchyňském zařízení. Zvuk a fullsc
 
 ## Změny proti v16.5
 
+- v17.1: explicitní UTF-8 deklarace v HTML i HTTP hlavičce; Unicode normalizační regex je ASCII-safe.
 - Nativní transakční SQLite backend místo tabulek a fronty Commands.
 - Stejný HTML/CSS klient, karty, gesta, animace a zvukové chování; změněna pouze transportní vrstva.
 - Opraveno swipe odstranění Upozornění (CSS `touch-action`).
