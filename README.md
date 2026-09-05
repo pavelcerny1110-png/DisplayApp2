@@ -6,6 +6,10 @@ Kuchyňský displej pro **ChatGPT**, samostatně provozovaný na Cloudflare.
 Displej načítá `/api/display` každé 3 sekundy; gesta zapisují přímo do `/api/action`.
 Google Apps Script, Google Sheets ani Grok se nepoužívají.
 
+**Živý displej:** https://displayapp2.pavelcerny1110.workers.dev/
+
+**Obsluha z dalšího chatu:** [docs/OPERATIONS.md](docs/OPERATIONS.md) obsahuje ověřené Make scénáře, jejich ID, způsob volání a výsledky živého testu. Úplná konfigurace mostů je v [integrations/make-bridges.json](integrations/make-bridges.json).
+
 ## Nasazení
 
 Kompletní zdroj je v tomto repozitáři, produkční větev `main`. Cloudflare Workers Builds je propojeno s repozitářem; deploy příkaz `npx wrangler deploy`, root `/`, samostatný build příkaz není potřeba.

@@ -1,0 +1,46 @@
+{
+  "version": "17.0",
+  "format": "Make.scenario_create arguments, not native Make blueprint",
+  "verifiedAt": "2026-09-05",
+  "note": "Both deployed scenarios are active. Restore copies are deliberately created inactive. Do not duplicate scenarios during ordinary use; inspect existing IDs first.",
+  "bridges": [
+    {
+      "scenarioId": 7256768,
+      "deployedActive": true,
+      "createArguments": {
+        "teamId": 2672945,
+        "name": "DisplayApp2 Read Bridge",
+        "modules": [
+          {"id":1,"module":"scenario-service:StartSubscenario","version":2,"root":"main","parameters":{},"mapper":{},"label":"Read request from ChatGPT"},
+          {"id":2,"module":"http:MakeRequest","version":4,"follows":1,"parameters":{"authenticationType":"noAuth"},"mapper":{"url":"https://displayapp2.pavelcerny1110.workers.dev/api/{{switch(1.resource; \"log\"; \"log\"; \"health\"; \"health\"; \"display\")}}","method":"get","contentType":"","headers":[],"queryParameters":[{"name":"service_id","value":"{{1.service_id}}"}],"parseResponse":true,"paginationType":"","stopOnHttpError":true,"timeout":30,"allowRedirects":false,"shareCookies":false,"requestCompressedContent":true},"label":"Read Cloudflare snapshot or service archive"},
+          {"id":3,"module":"scenario-service:ReturnData","version":2,"follows":2,"parameters":{},"mapper":{"http_status":"{{2.statusCode}}","response":"{{2.data}}"},"label":"Return authoritative data to ChatGPT"}
+        ],
+        "scheduling": {"type":"on-demand"},
+        "interface": {
+          "input": [{"name":"resource","type":"select","default":"display","options":[{"label":"Current display","value":"display"},{"label":"Service log","value":"log"},{"label":"Health check","value":"health"}]},{"name":"service_id","type":"text","default":""}],
+          "output": [{"name":"http_status","type":"integer"},{"name":"response","type":"any"}]
+        },
+        "autoActivate": false
+      }
+    },
+    {
+      "scenarioId": 7256818,
+      "deployedActive": true,
+      "createArguments": {
+        "teamId": 2672945,
+        "name": "DisplayApp2 Command Bridge",
+        "modules": [
+          {"id":1,"module":"scenario-service:StartSubscenario","version":2,"root":"main","parameters":{},"mapper":{},"label":"Command JSON from ChatGPT"},
+          {"id":2,"module":"http:MakeRequest","version":4,"follows":1,"parameters":{"authenticationType":"noAuth"},"mapper":{"url":"https://displayapp2.pavelcerny1110.workers.dev/api/command","method":"post","contentType":"json","inputMethod":"jsonString","jsonStringBodyContent":"{{1.command_json}}","headers":[],"queryParameters":[],"parseResponse":true,"paginationType":"","stopOnHttpError":false,"timeout":30,"allowRedirects":false,"shareCookies":false,"requestCompressedContent":true},"label":"Send one command or batch to Cloudflare"},
+          {"id":3,"module":"scenario-service:ReturnData","version":2,"follows":2,"parameters":{},"mapper":{"http_status":"{{2.statusCode}}","response":"{{2.data}}"},"label":"Return server result and snapshot to ChatGPT"}
+        ],
+        "scheduling": {"type":"on-demand"},
+        "interface": {
+          "input": [{"name":"command_json","type":"text","required":true,"multiline":true,"label":"Display API command or batch as JSON"}],
+          "output": [{"name":"http_status","type":"integer"},{"name":"response","type":"any"}]
+        },
+        "autoActivate": false
+      }
+    }
+  ]
+}
