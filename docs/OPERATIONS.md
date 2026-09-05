@@ -4,6 +4,8 @@
 
 Produkční kód je nyní v17.1. Oproti v17.0 opravuje pouze načítání frontendu na reálném telefonu: explicitní UTF-8 v HTML i HTTP hlavičce a ASCII-safe normalizační regex. Make bridge a API smlouva se nemění. Níže uvedené v17.0 live testy zůstávají historickým záznamem původního vydání.
 
+Před produkčním nasazením v17.1 prošly Node/SQLite testy, statická kontrola, Wrangler dry-run a skutečný lokální `workerd-smoke`, který navíc ověřuje `Content-Type: text/html; charset=utf-8`, `<meta charset="utf-8">` a ASCII-safe Unicode normalizační regex.
+
 Ověřeno 5. 9. 2026. Tento dokument je provozní vodítko, nikoli náhrada aktuálního kódu nebo skutečného stavu API.
 
 ## Kam se připojit
