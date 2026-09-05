@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "displayapp2",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-05",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "KITCHEN", "class_name": "Kitchen" }]
+  },
+  "migrations": [{ "tag": "v17-initial", "new_sqlite_classes": ["Kitchen"] }],
+  "observability": { "enabled": true }
+}

@@ -1,0 +1,481 @@
+{
+  "sourceSha256": "d47b90fe0d758cf877a44eb9ef40f6ff2590eba940b6afca7a78fb10eed0bc46",
+  "fixtures": [
+    {
+      "action": "upsert_item",
+      "payload": {
+        "item": {
+          "id": "order-a",
+          "type": "order",
+          "title": "#1 T5",
+          "body": "Kuřecí řízek – 160 Kč\nHranolky – 55 Kč",
+          "data": {
+            "order_number": 1
+          }
+        }
+      },
+      "at": "2026-09-05T08:00:00.000Z",
+      "commandId": "golden-0",
+      "sha256": "b80bd4c2f48e4b9af0d317d4d80c7c7118bbdcc32df261b24426f3b4d557672e"
+    },
+    {
+      "action": "upsert_item",
+      "payload": {
+        "item": {
+          "id": "info-a",
+          "type": "info",
+          "title": "#1 T5",
+          "body": "Kuřecí řízek – 160 Kč\nHranolky – 55 Kč",
+          "data": {}
+        }
+      },
+      "at": "2026-09-05T08:01:00.000Z",
+      "commandId": "golden-1",
+      "sha256": "69d4c5c5951a35d107ad565a6fe23fc066a728264591fb9b21b6698bcebe27fc"
+    },
+    {
+      "action": "attach_card",
+      "payload": {
+        "parent_order_id": "order-a"
+      },
+      "target": "info-a",
+      "at": "2026-09-05T08:02:00.000Z",
+      "commandId": "golden-2",
+      "sha256": "767ad00caeb516dfa0de89caf6b5b7388cadbb0356fd52cf50758f6895e7119e"
+    },
+    {
+      "action": "serve_order_items",
+      "payload": {
+        "items": [
+          "Kuřecí řízek"
+        ]
+      },
+      "target": "order-a",
+      "at": "2026-09-05T08:03:00.000Z",
+      "commandId": "golden-3",
+      "sha256": "d8bbe71ad4a333430b4821ff901cb450671839c2c220708be78631c4ab2e2030"
+    },
+    {
+      "action": "complete_order",
+      "payload": {},
+      "target": "order-a",
+      "at": "2026-09-05T08:04:00.000Z",
+      "commandId": "golden-4",
+      "sha256": "9c99196c91fc96f7e4457d14e5d8a10aa809d804eaf7cbd5fab415335ac7616e"
+    },
+    {
+      "action": "reopen_order",
+      "payload": {},
+      "target": "order-a",
+      "at": "2026-09-05T08:05:00.000Z",
+      "commandId": "golden-5",
+      "sha256": "5aa74bf54ded54dae81705f493a5e2099ab3f8a425ddbc01150479e1b3d79854"
+    },
+    {
+      "action": "set_order_item_states",
+      "payload": {
+        "served_items": []
+      },
+      "target": "order-a",
+      "at": "2026-09-05T08:06:00.000Z",
+      "commandId": "golden-6",
+      "sha256": "c53d1e76d3fc855a9fe36a8f6ef50f46458a96b668e75c8a5545fa6dfd738d41"
+    },
+    {
+      "action": "set_order_item_states",
+      "payload": {
+        "served_items": [
+          "Hranolky – 55 Kč"
+        ]
+      },
+      "target": "order-a",
+      "at": "2026-09-05T08:07:00.000Z",
+      "commandId": "golden-7",
+      "sha256": "78166df823aa84e74b3ad642af4bcbac9a68d440352e1d9d4adbab795f472de9"
+    },
+    {
+      "action": "set_order_item_states",
+      "payload": {
+        "served_items": [
+          "Kuřecí řízek – 160 Kč",
+          "Hranolky – 55 Kč"
+        ]
+      },
+      "target": "order-a",
+      "at": "2026-09-05T08:08:00.000Z",
+      "commandId": "golden-8",
+      "sha256": "4a22f987a12229fa4d46f17d9d5ecba33dcaf5eb1a26279f471c2af0c8692563"
+    },
+    {
+      "action": "reopen_order",
+      "payload": {},
+      "target": "order-a",
+      "at": "2026-09-05T08:09:00.000Z",
+      "commandId": "golden-9",
+      "sha256": "b26201f3fd2e27dc4349d1b9e2f92ce12e8a087b4101de308a064a695ad56f09"
+    },
+    {
+      "action": "detach_card",
+      "payload": {},
+      "target": "info-a",
+      "at": "2026-09-05T08:10:00.000Z",
+      "commandId": "golden-10",
+      "sha256": "aad04d3c425163089bd8dd49efec499390f5ef7c4c8b05c05c453f3ecc42b13e"
+    },
+    {
+      "action": "patch_item",
+      "payload": {
+        "patch": {
+          "body": "Bez soli"
+        },
+        "data_json_patch": {
+          "accent": "blue",
+          "remove": null
+        }
+      },
+      "target": "info-a",
+      "at": "2026-09-05T08:11:00.000Z",
+      "commandId": "golden-11",
+      "sha256": "65843b9d0682c481022dac52bf79a9a4925ec7232cc91f2801d28b52a993ccc4"
+    },
+    {
+      "action": "complete_card",
+      "payload": {},
+      "target": "info-a",
+      "at": "2026-09-05T08:12:00.000Z",
+      "commandId": "golden-12",
+      "sha256": "0f7b5940ec0128f7be0138e38c0acab9f78baca6d210d65f60702074d4254cd5"
+    },
+    {
+      "action": "cancel_order",
+      "payload": {},
+      "target": "order-a",
+      "at": "2026-09-05T08:13:00.000Z",
+      "commandId": "golden-13",
+      "sha256": "fefd34add7535a1f644695576f2842287f8f02f964e2d77369960bc7ca0ef513"
+    },
+    {
+      "action": "set_status",
+      "payload": {
+        "status": "waiting"
+      },
+      "target": "order-a",
+      "at": "2026-09-05T08:14:00.000Z",
+      "commandId": "golden-14",
+      "sha256": "89fdffd788983630711fee40146027bf1cc8ac86f404ca8004b8a7e4cf9a4098"
+    },
+    {
+      "action": "upsert_items",
+      "payload": {
+        "items": [
+          {
+            "id": "order-b",
+            "type": "order",
+            "title": "#1 T5",
+            "body": "Kuřecí řízek – 160 Kč\nHranolky – 55 Kč",
+            "data": {
+              "order_number": 2
+            }
+          },
+          {
+            "id": "order-c",
+            "type": "order",
+            "title": "#1 T5",
+            "body": "Kuřecí řízek – 160 Kč\nHranolky – 55 Kč",
+            "data": {
+              "order_number": 3
+            },
+            "channel": "other"
+          },
+          {
+            "id": "alert-a",
+            "type": "alert",
+            "title": "Pozor"
+          },
+          {
+            "id": "reminder-a",
+            "type": "reminder",
+            "data": {
+              "remind_at": "2026-09-05T10:30:00+02:00"
+            }
+          }
+        ]
+      },
+      "at": "2026-09-05T08:15:00.000Z",
+      "commandId": "golden-15",
+      "sha256": "44ab56faa4b857f2979dcc40647344ddb74062e53c6c53b74dc3108fef6e3f60"
+    },
+    {
+      "action": "pin_card",
+      "payload": {
+        "parent_order_id": "order-b"
+      },
+      "target": "alert-a",
+      "at": "2026-09-05T08:16:00.000Z",
+      "commandId": "golden-16",
+      "sha256": "8c30e38a058f6f3d5e9d20f1931069f10c55f009f66a81125efde34dda5f4e29"
+    },
+    {
+      "action": "unpin_card",
+      "payload": {},
+      "target": "alert-a",
+      "at": "2026-09-05T08:17:00.000Z",
+      "commandId": "golden-17",
+      "sha256": "3c218cbed1f002aaeeb73ad7b51653c8ff2c0ec81467a0678557fdc4d8d8dfda"
+    },
+    {
+      "action": "serve_order",
+      "payload": {
+        "selector": {
+          "order_number": 2
+        }
+      },
+      "at": "2026-09-05T08:18:00.000Z",
+      "commandId": "golden-18",
+      "sha256": "3d5612c2e13c0cabe246c968d07d7a4cb80cf484ec72f9e4016ce1a77da7d4ee"
+    },
+    {
+      "action": "complete_card",
+      "payload": {},
+      "target": "reminder-a",
+      "at": "2026-09-05T08:19:00.000Z",
+      "commandId": "golden-19",
+      "sha256": "f749d24d487ee88c387022793198294958bda91212eb1f3386dffc05daceca82"
+    },
+    {
+      "action": "set_status",
+      "payload": {
+        "status": "active"
+      },
+      "target": "reminder-a",
+      "at": "2026-09-05T08:20:00.000Z",
+      "commandId": "golden-20",
+      "sha256": "a882b5d321c3a1b90f68a34c86164c7635d05c3335ba22ddb3e378c1954d25cd"
+    },
+    {
+      "action": "partial_serve",
+      "payload": {
+        "items": [
+          "Kuřecí řízek"
+        ],
+        "complete_when_empty": false
+      },
+      "target": "order-a",
+      "at": "2026-09-05T08:21:00.000Z",
+      "commandId": "golden-21",
+      "sha256": "fcd22745429fc1dac0e070da60e89d4f3d55c7ccd24bc3b3094d3008b9e2ccd2"
+    },
+    {
+      "action": "delete_item",
+      "payload": {
+        "allow_missing": true
+      },
+      "target": "item-missing",
+      "at": "2026-09-05T08:22:00.000Z",
+      "commandId": "golden-22",
+      "sha256": "49b45e3ba4e2124902d26fa537a5046f5d2e20096af3c1905e1bb8048e12f8db"
+    },
+    {
+      "action": "delete_item",
+      "payload": {},
+      "target": "info-a",
+      "at": "2026-09-05T08:23:00.000Z",
+      "commandId": "golden-23",
+      "sha256": "abdc35bc8b20b5205de80b7784e518e50e1ae3ad74291c743440b1e3ae85dc02"
+    },
+    {
+      "action": "clear_channel",
+      "payload": {
+        "channel": "other"
+      },
+      "at": "2026-09-05T08:24:00.000Z",
+      "commandId": "golden-24",
+      "sha256": "230a1816e4ab24eb9d6f263314bbe8666d4441c3ec77655ed14bfff32d33010a"
+    },
+    {
+      "action": "clear_display",
+      "payload": {},
+      "at": "2026-09-05T08:25:00.000Z",
+      "commandId": "golden-25",
+      "sha256": "08c6782028e1d6105d758183a304fd6f98427c867346bd7f8645948edcc5d8d5"
+    },
+    {
+      "action": "add_item",
+      "payload": {
+        "item": {
+          "id": "type-message",
+          "type": "message",
+          "title": "message",
+          "data": {
+            "content": [
+              1,
+              2
+            ]
+          }
+        }
+      },
+      "at": "2026-09-05T08:26:00.000Z",
+      "commandId": "golden-26",
+      "sha256": "a100159c1d00baf28ff23ba36f17b0f4e48f884466d19228cb6aa74d8519565d"
+    },
+    {
+      "action": "add_item",
+      "payload": {
+        "item": {
+          "id": "type-media",
+          "type": "media",
+          "title": "media",
+          "data": {
+            "content": [
+              1,
+              2
+            ]
+          }
+        }
+      },
+      "at": "2026-09-05T08:27:00.000Z",
+      "commandId": "golden-27",
+      "sha256": "5372f694edc26baec0beb2d14c508eab4b824e35fb78df7e7fd88fdc6d9dc5f0"
+    },
+    {
+      "action": "add_item",
+      "payload": {
+        "item": {
+          "id": "type-gallery",
+          "type": "gallery",
+          "title": "gallery",
+          "data": {
+            "content": [
+              1,
+              2
+            ]
+          }
+        }
+      },
+      "at": "2026-09-05T08:28:00.000Z",
+      "commandId": "golden-28",
+      "sha256": "69962b8e1f40ec31a6fd929cd6487d8af770468bc5d48b89d0f79647da1334ca"
+    },
+    {
+      "action": "add_item",
+      "payload": {
+        "item": {
+          "id": "type-table",
+          "type": "table",
+          "title": "table",
+          "data": {
+            "content": [
+              1,
+              2
+            ]
+          }
+        }
+      },
+      "at": "2026-09-05T08:29:00.000Z",
+      "commandId": "golden-29",
+      "sha256": "4a6f6e6dbc4206e40cf2c2e25b08e04daef98df335d4f3666c63d7358f84096a"
+    },
+    {
+      "action": "add_item",
+      "payload": {
+        "item": {
+          "id": "type-checklist",
+          "type": "checklist",
+          "title": "checklist",
+          "data": {
+            "content": [
+              1,
+              2
+            ]
+          }
+        }
+      },
+      "at": "2026-09-05T08:30:00.000Z",
+      "commandId": "golden-30",
+      "sha256": "1964801df7e58b3d4123abd9ae328f3f43d67d20d697578dcc36d19773100387"
+    },
+    {
+      "action": "add_item",
+      "payload": {
+        "item": {
+          "id": "type-tip",
+          "type": "tip",
+          "title": "tip",
+          "data": {
+            "content": [
+              1,
+              2
+            ]
+          }
+        }
+      },
+      "at": "2026-09-05T08:31:00.000Z",
+      "commandId": "golden-31",
+      "sha256": "f9f18b62f5b02150a7093d5f8dd3880353e4265ae3d5a4d66fb6c955d3e60aeb"
+    },
+    {
+      "action": "add_item",
+      "payload": {
+        "item": {
+          "id": "type-info",
+          "type": "info",
+          "title": "info",
+          "data": {
+            "content": [
+              1,
+              2
+            ]
+          }
+        }
+      },
+      "at": "2026-09-05T08:32:00.000Z",
+      "commandId": "golden-32",
+      "sha256": "ba3e0aa4c10d1b26eac4fa68291922d7f6d1d91a0c2aa4aa0b6583ddb0689845"
+    },
+    {
+      "action": "add_item",
+      "payload": {
+        "item": {
+          "id": "type-reminder",
+          "type": "reminder",
+          "title": "reminder",
+          "data": {
+            "content": [
+              1,
+              2
+            ]
+          }
+        }
+      },
+      "at": "2026-09-05T08:33:00.000Z",
+      "commandId": "golden-33",
+      "sha256": "19f37f2b5470e85e1205a6240c684212214346c21b8d750f1c075dfbb5d66389"
+    },
+    {
+      "action": "add_item",
+      "payload": {
+        "item": {
+          "id": "type-alert",
+          "type": "alert",
+          "title": "alert",
+          "data": {
+            "content": [
+              1,
+              2
+            ]
+          }
+        }
+      },
+      "at": "2026-09-05T08:34:00.000Z",
+      "commandId": "golden-34",
+      "sha256": "8c2b5d556c6ba9b120df933e03eb3a63de205a83247c4fdc27db7a7de45abae4"
+    },
+    {
+      "action": "clear_display",
+      "payload": {},
+      "at": "2026-09-05T08:35:00.000Z",
+      "commandId": "golden-35",
+      "sha256": "8b049f6e4b22b1bcc97f9046b12e3a8f3ce2e79e37f1efb57734852d58fe2fbe"
+    }
+  ]
+}
