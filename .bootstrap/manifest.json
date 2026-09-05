@@ -1,0 +1,27 @@
+{
+  "archiveSHA256": "8a8a0c43f02a209dc66f24c3f333d6ce8e046f7aeb8b68ed531e702cc3698854",
+  "files": {
+    ".gitignore": "37089d20d58d64610a5a5fd0e601fba8e0167b29b7336a32ef1e5a2deb066451",
+    "README.md": "0549d60aa284846975bd9c55c08cadea11cb9a297908d461b7b8c77b0708f661",
+    "docs/API.md": "73d62dda95283dfa716c126cb19efce5106ad9b33d26e3c4ed31209f9ea079eb",
+    "docs/PARITY.md": "9fc79b13ee5877fc275bc8e1b63c619b5449c9b8f9cc7c615e53a4291687e81d",
+    "docs/source-provenance.json": "f7cd380f38d1f9ecccdf6fc09e9214d2d1c9d6fdc248768ab2bca02ad3a1eb6c",
+    "package.json": "ead46e23eb0ee3b1927ba029c281e095da2f6c649edd24c12c357d51a40a0789",
+    "public/index.html": "c41d1bcbba2a3f2ff45073b81b834a9c2b27c217908f668bd9f085054b116e51",
+    "scripts/check.js": "26d4637ee57ad361f8019bcaeedc65f86d72004baa2558c49b554e59b8c1bf6d",
+    "scripts/workerd-smoke.js": "261b790e583b9e9a89ec16762c5756ac78f346bfb18fa1b6449a901dda719360",
+    "src/api.js": "7006508110c9604a195fb62d36f3440f429e20390c2f81b7606d549808cec58a",
+    "src/engine.js": "71baea2a1cc2e8e14e378fecbdff7846a00b93b0b5046a4ccd90ca83cd322cd7",
+    "src/http.js": "7b4c6e9b8e2cff9df7a4296137c3adf5f7b2a1099bba64da36814e8e46cc10f3",
+    "src/settings.js": "a574a0f680f509e73cd7ae24ce8caaa3e379e352ed70ac34b3e5dcaf651c7988",
+    "src/store.js": "8e7b77e3658d8d28d2492a9be9a843928a3c6f48a4288e13ae0d1bf6151fe2b6",
+    "src/worker.js": "d313a5ce833f2e6ca616b6acfbff434d5b2f56f72df096b985ce693d4cfafd3c",
+    "tests/api.test.js": "89ad787fc0f8e413f040803e60ac1ada97b2e521b3cb39ecf851c4af78222b5a",
+    "tests/browser-rpc.js": "cfb9eb6a9c39b7afc0727028cb2203f2c5ca98d652c346842daf55fc88d2af57",
+    "tests/browser_check.py": "36528b1232dd327c885ebacc8ae1948e73b755dee508649532aa21d49dcb1784",
+    "tests/parity-golden.json": "b61df0b7d7f8e034789737c91d11b3ddda928c579562d1389f2718c3d08286d2",
+    "tests/parity.test.js": "4e2168b6c5c6898b51e387e93e16cdcdf291b0c2003d7b11e52fe53b451ce039",
+    "tests/sqlite.js": "6fe7427e66ab222467fa4901e85f673fa0296e463474cc84846d08a8d89550e4",
+    "wrangler.jsonc": "ed5c116c9ce165c1cba25cd8286ab16459d45f66a762965375c85a917ecc6959"
+  }
+}
