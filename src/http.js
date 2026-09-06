@@ -50,7 +50,8 @@ export async function handleApi(request, api) {
     if (request.method === 'POST' && path === '/api/command') {
       // Read the request asynchronously, THEN do all engine/storage work without
       // yielding. No request can interleave inside a command or manual mutation.
-      return json(api.commands(await readJson(request)));
+      const response = api.commands(await readJson(request));
+      return json(response, response.conflict ? 409 : 200);
     }
     if (request.method === 'POST' && path === '/api/action') {
       const response = api.action(await readJson(request));

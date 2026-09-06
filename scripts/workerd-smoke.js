@@ -35,17 +35,23 @@ async function request(path,body) {
 }
 try {
   await start();
-  assert.equal((await request('/api/health')).body.version,'17.1');
+  assert.equal((await request('/api/health')).body.version,'17.2');
   const document=await fetch(base+'/');
   assert.equal(document.status,200);
   assert.match(document.headers.get('content-type') || '', /^text\/html;\s*charset=utf-8/i);
   const documentText=await document.text();
-  assert.match(documentText,/DISPLAY_APP_VERSION = '17.1'/);
+  assert.match(documentText,/DISPLAY_APP_VERSION = '17.2'/);
   assert.match(documentText,/<meta charset=\"utf-8\">/i);
   assert.ok(documentText.includes(".replace(/[\\u0300-\\u036f]/g, '')"));
-  const command={command_id:'ci-create',action:'upsert_item',payload:{item:{id:'ci-order',type:'order',title:'#1 TEST',body:'Polévka\nŘízek'}}};
-  assert.equal((await request('/api/command',command)).body.ok,true);
+  const command={expected_revision:0,command_id:'ci-create',action:'upsert_item',payload:{item:{id:'ci-order',type:'order',data:{recipient:{type:'table',value:'T5'},order_items:[{name:'Polévka',quantity:2,pricing_status:'known',price_basis:'unit',unit_price:50},{name:'Řízek',quantity:1,pricing_status:'known',unit_price:160}]}}}};
+  const created=await request('/api/command',command);
+  assert.equal(created.body.ok,true);
+  assert.equal(created.body.results[0].result.orderNumber,1);
+  assert.equal(created.body.data.items[0].title,'Objednávka 1 - stůl T5');
+  assert.equal(JSON.parse(created.body.data.items[0].data_json).pricing.total_price,260);
   assert.equal((await request('/api/command',command)).body.results[0].status,'duplicate');
+  const stale=await request('/api/command',{expected_revision:0,command_id:'ci-stale',action:'upsert_item',payload:{item:{id:'should-not-exist',type:'order',body:'X'}}});
+  assert.equal(stale.status,409);assert.equal(stale.body.conflict,true);
   const item=(await request('/api/display')).body.items[0];
   const gesture={action:'toggle_order_completion',item_id:item.id,expected_updated_at:item.updated_at,expected_status:item.status};
   const results=await Promise.all([request('/api/action',gesture),request('/api/action',gesture)]);
