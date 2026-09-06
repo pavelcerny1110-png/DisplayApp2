@@ -39,6 +39,13 @@ export class KitchenApi {
     if (!isObject(input)) throw new InputError('Požadavek musí být JSON objekt.');
     const batch = Object.hasOwn(input, 'commands') ? input.commands : [input];
     if (!Array.isArray(batch) || !batch.length || batch.length > 100) throw new InputError('commands musí obsahovat 1 až 100 příkazů.');
+    const rawExpectedRevision = input.expected_revision ?? input.expectedRevision;
+    let expectedRevision = null;
+    if (rawExpectedRevision !== undefined && rawExpectedRevision !== null && rawExpectedRevision !== '') {
+      const parsed = Number(rawExpectedRevision);
+      if (!Number.isInteger(parsed) || parsed < 0) throw new InputError('expected_revision musí být nezáporné celé číslo.');
+      expectedRevision = parsed;
+    }
     // Validate the envelope BEFORE accepting any part of the request.
     const commands = batch.map(raw => {
       if (!isObject(raw) || typeof raw.action !== 'string' || !raw.action.trim()) throw new InputError('Každý příkaz musí mít action.');
@@ -50,6 +57,25 @@ export class KitchenApi {
       return { commandId: id, action: E.canonicalCommandAction_(raw.action), target: raw.target, payload };
     });
     this.store.atomic(() => this.store.cleanupCommands());
+    // A stale conditional write is rejected before any new command is accepted.
+    // Duplicate-only retries remain readable even with an old revision so a
+    // network retry of the same command_id can safely learn its original result.
+    const hasNewCommand = commands.some(command => !this.store.command(command.commandId));
+    const currentRevision = Number(this.store.getMeta('revision', 0));
+    if (expectedRevision !== null && hasNewCommand && expectedRevision !== currentRevision) {
+      const report = emptyReport();
+      return {
+        ok: false,
+        conflict: true,
+        busy: false,
+        message: 'Backend se mezitím změnil. Načtěte vrácený snapshot a příkaz sestavte znovu.',
+        expectedRevision,
+        currentRevision,
+        results: [],
+        commandReport: report,
+        data: this.snapshot(report)
+      };
+    }
     // Only not-yet-accepted commands can form a clear barrier. A duplicate clear
     // is genuinely a no-op, including when retried alongside other commands.
     let barrier = -1;

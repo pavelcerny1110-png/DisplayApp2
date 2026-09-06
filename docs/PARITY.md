@@ -1,44 +1,56 @@
-# Přenos v16.5 → v17.1
+# Přenos v16.5 → v17.2
 
 ## Výchozí zdroj
 
-Kontrolní součty a seznam 76 přenesených čistých funkcí jsou v `source-provenance.json`. Odpovídají poslední záloze v16.5 a přiloženým zdrojovým souborům, nikoli jen handover dokumentu. Frontend je úplný původní soubor; nezávislé přepsání vizuálu se neprovádělo.
+Kontrolní součty a seznam 76 přenesených čistých funkcí jsou v `source-provenance.json`. Odpovídají poslední záloze v16.5 a přiloženým zdrojovým souborům, nikoli jen handover dokumentu. Frontend zůstává úplným původním rozhraním; v17.2 nemění layout, gesta ani vizuální provozní model kromě čísla verze.
 
-## Zachováno
+## Zachováno z v16.5/v17.1
 
-- Čekající / Hotovo / Zrušeno, čas přijetí, běžící čekání, pořadí karet, původní mizení po 60 s.
+- Čekající / Hotovo / Zrušeno, čas přijetí, běžící čekání, pořadí karet a mizení hotových karet po 60 s.
 - Tap dokončení a přesné undo včetně předchozího částečného vydání; long-press dialog položek.
-- Swipe čekající objednávky zruší a skryje, swipe hotové/zrušené pouze skryje; příslušná práce s připnutými kartami.
-- Tip/Info připnutí, odpojení, dokončení, zobrazení příjemce a cen.
-- Připomínka: čas aktivace, cyklus 20 s zvuk / 40 s ticho, lokální pulzování, potvrzení.
-- Upozornění: nepřetržitá siréna, tap místní mute/unmute, nový alert sirénu znovu zapne.
-- Baterie 10 % / 5 %, odlišné délky sirény a priority Battery > Alert > Reminder, vypnutí tapem či nabíječkou.
-- Optimistická gesta, synchronizace po konfliktu, zadržení pollu během zápisu, žádné automatické opakování nejistého zápisu.
-- Zvuky jednotlivých událostí, fullscreen, wake lock, lokální téma, orientace, hodinové/empty stavy, overflow a scroll/visibility chování.
-- Obecné message/media/gallery/table/checklist karty: existující rendering a datová schémata.
-- Europe/Prague, serverové časy přijetí/výdeje/dokončení/reopen/zrušení, service_id jako datum, manuální revize.
-- Oddělený autoritativní stav objednávek a chronologické události, rozlišení chat/display zdroje, trvalý archiv skrytých karet.
-- Výběr kanálů a nastavení nadále reprezentovány serverovými settings; výchozí hodnoty nyní v `src/settings.js`, nikoli v Google Sheet.
+- Swipe waiting objednávky zruší a skryje, swipe hotové/zrušené pouze skryje; práce s připnutými kartami zůstává.
+- Tip/Info/Připomínka/Upozornění, alarmy, lokální alert mute, baterie, zvuky, fullscreen, wake lock, téma a orientace.
+- Optimistická gesta s `expected_updated_at`/`expected_status`, 409 konflikt a návrat k autoritativnímu snapshotu; frontend zápisy automaticky neopakuje.
+- Europe/Prague, serverové časy, service_id, persistentní archiv, order events a rozlišení zdroje chat/display.
+- API příkazy, jejich aliasy, command-id deduplikace a oddělení viditelného display snapshotu od archivu.
+- Staré nestrukturované objednávky zůstávají kompatibilní; nové strukturované chování se aktivuje přes `data.order_items`.
 
-## Výslovně změněno
+## Nově ve v17.2
 
-Transport GAS/Sheets byl nahrazen HTTP a SQLite transakcemi. Původní tabulková fronta již neexistuje; clear barrier platí na dosud neprovedené příkazy přijaté dávky. Dedupe potvrzení se drží nejméně 24 h. Archiv nemá automatickou retenční očistu. Historie staré aplikace se neimportuje.
+### Serverové provozní číslování
 
-Tři UI úpravy: alert touch-action pro swipe; alert viewport 10 s; reminder viewport 10 s a poté pouze karta. Verze 17.1. Při prvním otevření nového originu se místní preference z Apps Scriptu automaticky nepřenášejí.
+Provozní číslo nové objednávky už neurčuje ChatGPT. Backend vede aktivní sérii per channel: první nová objednávka po vyprázdnění waiting stavu je #1; dokud alespoň jedna waiting objednávka zůstává, čísla pokračují. Částečně vydaná objednávka je dál waiting a reset blokuje. `reopen_order` zachová původní číslo, takže historicky znovuotevřená objednávka může mít stejné číslo jako objednávka současné série; interní ID zůstává autoritativní cíl.
 
-## Ověření při přípravě
+### Revision precondition
 
-- 26 úspěšných Node testů nad skutečnou SQLite databází.
-- Golden parity test z původního v16.5 enginu: 36 kroků (normalizace, příkazy, položky, připnutí, stav, undo, audit a chyby).
-- Chromium: skutečné touch swipe alertu přes API, tap připomínky, optimistický tap při zpožděném POST, undo, long-press dialog.
-- Časově ověřeny oba 10s viewport pulzy a pokračující animace reminder karty.
-- Pixelově shodné snímky proti v16.5 pro reprezentativní snapshot na 412×915 a 1280×800 při zastavených hodinách a animacích.
-- Statická kontrola JS syntaxe, verze, časů, CSS, absence GAS závislostí a deklarace SQLite bindingu.
+`POST /api/command` přijímá `expected_revision`. Pokud požadavek obsahuje nový command ID a aktuální revision neodpovídá, vrátí se HTTP 409 + aktuální snapshot a před provedením dávky se neprovede žádný nový příkaz. Duplicate-only retry již známého command ID zůstává bezpečný i se starou revision.
 
-`workerd-smoke.js` ověřuje navíc lokální skutečný Workers runtime, persistentní SQLite, souběh dvou gest a restart. Výsledky tohoto CI a skutečné produkční nasazení je nutné posuzovat podle běhu GitHub/Cloudflare, ne podle tohoto seznamu.
+### Strukturované položky, ceny a příjemce
 
-Simulované a automatické testy **nenahrazují zkoušku na kuchyňském telefonu**: fyzická baterie, zvuk, OS spořič, fullscreen a wake lock vyžadují kontrolu v cílovém prostředí. Pixelový test nepokrývá každou možnou kartu nebo animovaný snímek.
+Nová objednávka může používat `data.order_items` s trvalým line-item ID, názvem, množstvím, stavem a explicitní cenovou semantikou. `quantity > 1` zůstává jeden logický checkbox. Cena může být `known`, `unknown` nebo `free`; známá cena rozlišuje `unit` a `total`, takže výslovná cena celé položky se množstvím znovu nenásobí. `pricing_override` může explicitně určit cenu celé objednávky.
 
-## Oprava v17.1
+Příjemce je strukturovaný jako `table/person/none`; způsob výdeje `dine_in/takeaway/box/unspecified` je samostatný údaj. Archiv zachovává i kompatibilní starší pole.
 
-HTML explicitně deklaruje UTF-8 v dokumentu i HTTP odpovědi a normalizační regex používá ASCII escape, aby se JavaScript nerozbil při chybném autodetekování znakové sady. `workerd-smoke.js` tuto cestu regresně kontroluje.
+## Výslovně nezměněno ve v17.2
+
+- Žádný viditelný stav alert mute; mute zůstává lokální.
+- Žádný viditelný odpočet připomínky.
+- Žádný sync indikátor, stáří nejstarší objednávky, zvýraznění dlouhého čekání, vibrace ani diagnostická obrazovka.
+- Poll zůstává 3 s; WebSocket/SSE není součástí v17.2.
+- Make Read/Command bridge se nemění; v17.2 využívá stejný transport.
+
+## Ověření
+
+Lokálně před sestavením release prošlo:
+
+- 31 Node/SQLite testů, včetně nových testů serverového číslování, historical reopen, revision 409, duplicate retry, strukturovaných cen, recipient/fulfillment, archivu a částečného vydávání.
+- Původní golden parity test: 36 kroků proti přenesenému v16.5 enginu.
+- Statická kontrola `npm run check`.
+
+Release CI musí navíc projít `wrangler deploy --dry-run` a `workerd-smoke.js` nad skutečným lokálním Workers runtime. Teprve úspěšný běh CI a následné produkční ověření potvrzují vydání v17.2.
+
+Chromium/pixelové testy z v17.0 zůstávají referenčním vizuálním základem; v17.2 frontendové chování ani layout nemění. Automatické testy nenahrazují zkoušku na fyzickém kuchyňském telefonu.
+
+## Historická oprava v17.1
+
+V17.1 přidala explicitní UTF-8 v HTML i HTTP odpovědi a ASCII-safe normalizační regex, aby se frontend nerozbil při chybném autodetekování znakové sady. Tato oprava zůstává ve v17.2 zachována.

@@ -1,59 +1,134 @@
-# API v17.0 a obsluha z ChatGPT
+# API v17.2 a obsluha z ChatGPT
 
-Všechny cesty jsou relativní ke **skutečné nasazené URL** tohoto Workeru. UTF-8 JSON, bez autentizace; CORS `*`. Maximální požadavek 1 MiB, dávka 1–100 příkazů. Chybná obálka 400, nesprávný Content-Type 415, velké tělo 413.
+Všechny cesty jsou relativní ke skutečné nasazené URL Workeru. UTF-8 JSON, bez autentizace; CORS `*`. Maximální požadavek 1 MiB, dávka 1–100 příkazů.
 
 ## Čtení
 
 - `GET /api/health`: verze, backend, časové pásmo, jméno objektu.
 - `GET /api/display`: `settings`, `activeChannel`, `items`, `commandReport`, `syncState`, `serverTime`, `version`.
-- `GET /api/log`: dnešní archiv Europe/Prague; `?service_id=YYYY-MM-DD` pro konkrétní den. Vrací `serviceId`, `orders`, `events`, `commandReport`, `serverTime`, `version`.
+- `GET /api/log`: archiv dne Europe/Prague; `?service_id=YYYY-MM-DD` pro konkrétní službu.
 
-`syncState.manualRevision` roste při skutečné změně gestem; `revision` zahrnuje i příkazy. Služební den je pražské kalendářní datum. Časy jsou serverové ISO UTC, UI je zobrazuje v Europe/Prague. `/api/display` není archiv: hotové karty si klient skrývá podle původních pravidel, archiv zůstává oddělený.
+`syncState.revision` roste při každé skutečné změně z příkazu i displeje. `manualRevision` roste jen při ruční změně gestem. `/api/display` není archiv; hotová karta může z displeje zmizet, zatímco `/api/log` ji zachovává.
 
-## Příkazy
+## Bezpečný zápis přes revision
 
-`POST /api/command`, Content-Type `application/json`:
+`POST /api/command`, Content-Type `application/json`.
+
+Klient může přidat top-level `expected_revision`:
 
 ```json
-{"command_id":"jedinecne-id","action":"upsert_item","payload":{"item":{"id":"order-jedinecne-id","type":"order","title":"#1 stůl T5","body":"Kuřecí řízek – 160 Kč\nHranolky – 55 Kč","status":"waiting","channel":"main","data":{"order_number":1,"customer_or_table":"stůl T5","total_price":215}}}}
+{"expected_revision":12,"command_id":"uuid","action":"complete_order","target":"order-id","payload":{}}
 ```
 
-Dávka: `{"commands":[{...},{...}]}`. Každá položka má vlastní `command_id`. Při chybě jednotlivého příkazu se jeho změny včetně auditů vrátí zpět, další příkazy pokračují. Nejde o jednu transakci celé dávky. Jediný `upsert_items` je naproti tomu atomický.
+Pokud se backend od revision 12 změnil a požadavek obsahuje alespoň jeden nový command ID, server vrátí **HTTP 409**, `conflict:true` a aktuální snapshot v `data`. Před konfliktem se neprovede žádný nový příkaz z dávky. Klient z vráceného snapshotu sestaví nový záměr s novým command ID.
 
-Identický `command_id` se znovu neprovede; server drží potvrzení **nejméně 24 hodin**, starší průběžně uklízí. Pro všechny nové příkazy použijte nové UUID. Při síťové nejistotě může klient bezpečně zopakovat původní ID v tomto okně, nikoli nové ID. Automatické opakování zápisu není zapnuté. Při vynechání server ID vygeneruje; pro spolehlivou integraci ho však posílejte.
+Výjimka: retry již zpracovaného `command_id` lze poslat se starou revision; duplicate-only retry vrátí původní výsledek a nic znovu neprovede. Dedupe je držen nejméně 24 hodin. Při síťové nejistotě tedy opakujte původní ID, ne nové.
 
-Výsledek: `ok`, `results[]`, `commandReport`, `data` (nový snapshot). Stavy výsledků `processed`, `duplicate`, `superseded`, `error`. Duplicitní odmítnutý příkaz zůstává odmítnutý (`originalStatus:error`, celkové `ok:false`). HTTP 200 samo o sobě neznamená provedení všech příkazů.
+Bez `expected_revision` zůstává starší kompatibilní chování. Pro Kitchen Assistant v17.2 je doporučen podmíněný zápis s poslední známou `revision`.
 
-`clear_display` a `clear_display_and_current_service_log` přeskočí starší dosud nezpracované příkazy **v téže dávce**. Samostatné HTTP požadavky nemají odloženou frontu: už potvrzené příkazy nelze zpětně označit za superseded. Změny se provádějí v pořadí, ve kterém dorazí ke zpracování.
+Dávka: `{"expected_revision":12,"commands":[{...},{...}]}`. Revision podmínka se kontroluje jednou před dávkou. Jednotlivé příkazy pak mají stejné transakční chování jako dříve: chyba jednoho příkazu vrátí jeho změny zpět, ostatní mohou pokračovat. `upsert_items` je atomický jako jeden příkaz.
 
-### Akce
+Výsledek obsahuje `ok`, `results[]`, `commandReport`, `data`. Stavy výsledků: `processed`, `duplicate`, `superseded`, `error`. HTTP 200 ani Make `success` samo o sobě neznamená, že všechny příkazy uspěly.
+
+## Nová objednávka a provozní číslo
+
+Novou objednávku stále vytváří `upsert_item`, ale **provozní číslo přiděluje backend**. Klient neposílá autoritativní `order_number` ani číslo v titulku.
+
+```json
+{
+  "expected_revision": 12,
+  "command_id": "uuid",
+  "action": "upsert_item",
+  "payload": {
+    "item": {
+      "id": "order-unikatni-id",
+      "type": "order",
+      "status": "waiting",
+      "channel": "main",
+      "data": {
+        "recipient": {"type":"table","value":"T5"},
+        "fulfillment": {"type":"box"},
+        "order_items": [
+          {"name":"Kuřecí směs","quantity":2,"pricing_status":"known","price_basis":"unit","unit_price":155},
+          {"name":"Kečup","quantity":1,"pricing_status":"free"}
+        ]
+      }
+    }
+  }
+}
+```
+
+Backend nastaví `order_number`, `operational_series_id`, `created_at`, `received_at`, `service_id`, titulek `Objednávka N - příjemce`, subtitle `Přijato v HH:mm ...` a odvodí display body. Výsledek příkazu vrací také přidělené `orderNumber`.
+
+Provozní pravidlo zůstává stejné: první objednávka aktivní série = 1; dokud existuje alespoň jedna waiting objednávka, další čísla pokračují; completed/cancelled reset neblokují; částečně vydaná waiting objednávka blokuje. Když nezůstane žádná waiting, nová objednávka zahájí novou sérii #1.
+
+`reopen_order` **nemění historické číslo**. Znovuotevřením starší objednávky proto mohou existovat dvě waiting objednávky se stejným provozním číslem. Pro změny vždy používejte interní order ID.
+
+## Strukturované položky
+
+`data.order_items` je autoritativní struktura nové objednávky. Každá logická položka má:
+
+- `id`: stabilní line-item ID; při vytvoření může chybět, server ho doplní,
+- `name`: celý název/modifikace položky,
+- `quantity`: celé číslo >= 1,
+- `status`: `waiting` nebo `served` (server jej synchronizuje),
+- `pricing_status`: `known`, `unknown`, `free`,
+- `price_basis`: u známé ceny `unit` nebo `total`,
+- `unit_price`, `total_price`.
+
+Více kusů stejného jídla zůstává jeden logický typ/checkbox. Např. `quantity:3` = jedna položka „3× Vývar“, ne tři checkboxy.
+
+Ceny:
+
+- `known + unit`: `total_price = unit_price × quantity`.
+- `known + total`: uvedený `total_price` je cena celé logické položky a **znovu se množstvím nenásobí**.
+- `free`: server nastaví 0 Kč.
+- `unknown`: číselná cena zůstává `null` a display ji označí jako neznámou.
+
+Backend vypočítá `data.pricing` s `status`, `total_price`, `known_subtotal`, `source`. Pokud je alespoň jedna cena neznámá, stav objednávky je `unknown`, celková cena je `null` a `known_subtotal` drží součet známých částek.
+
+Výslovně zadaná cena celé objednávky má přednost přes:
+
+```json
+{"pricing_override":{"status":"known","total_price":590}}
+```
+
+Pro explicitně bezplatnou celou objednávku lze použít `status:"free"`. Odstraněním `pricing_override` se cena znovu počítá z položek.
+
+Při opravě položek používejte jejich ID z aktuálního snapshotu a zachovejte je. `patch_item` nyní může pracovat i pouze s `data_json_patch`, např. aktualizovaným `order_items` nebo `pricing_override`.
+
+## Příjemce a způsob výdeje
+
+`data.recipient`:
+
+- `{ "type":"table", "value":"T5" }`
+- `{ "type":"person", "value":"Martin" }`
+- `{ "type":"none", "value":"" }`
+
+`data.fulfillment.type` je samostatný údaj: `dine_in`, `takeaway`, `box`, `unspecified`. „S sebou/do boxu“ tedy není typ příjemce.
+
+Archiv přímo vrací `recipient_type`, `recipient_value`, `fulfillment_type`, `pricing_status`, `known_subtotal` a zároveň zachovává kompatibilní `customer_or_table`, `total_price` a celé `item_json`.
+
+## Akce
 
 `upsert_item`, `upsert_items`, `patch_item`, `set_status`, `complete_order`, `reopen_order`, `cancel_order`, `serve_order_items`, `set_order_item_states`, `complete_card`, `delete_item`, `attach_card`, `detach_card`, `clear_display`, `clear_channel`, `clear_current_service_log`, `clear_all_order_logs`, `clear_display_and_current_service_log`.
 
-Původní aliasy zachovány, např. `add_item`, `create_item`, `serve_order`, `finish_order`, `pin_card`, `unpin_card`, `clear`, `undo_order`, `reopen`.
+Původní aliasy zůstávají. Stabilní interní ID je bezpečnější než číslo nebo titulek.
 
-Cíl lze určit `target` nebo původními selektory v payload; **preferujte stabilní interní ID** z aktuálního snapshotu. Číslo #1 se může během dne opakovat; nepovažujte ho za globálně jedinečné. Při nejasném cíli se nejdřív podívejte na stav. Příklad:
+`set_order_item_states` nastavuje přesný výběr vydaných logických položek. `serve_order_items` u strukturované objednávky vydá celý logický typ; nerozděluje jednotlivé kusy uvnitř `quantity`.
 
-```json
-{"command_id":"nove-jedinecne-id","action":"complete_order","target":"order-jedinecne-id","payload":{}}
-```
+Připomínka používá `data.remind_at` jako ISO timestamp s časovým pásmem; neplánuje se v Make.
 
-Nová objednávka dostává `created_at`, `received_at`, `service_id` a prefix „Přijato v HH:mm“ na serveru. ChatGPT je nemusí odhadovat ani posílat. Ceny, položky, přílohy, příjemce a číslování zpracovává ChatGPT podle pravidel kuchyňského záznamu. Typy `order`, `reminder`, `tip`, `info`, `alert` i původní obecné karty zůstávají zachované. Strukturovaná data jsou v `data` nebo `data_json`.
-
-Připomínka: `data.remind_at` (případně původní aliasy `remindAt`, `trigger_at`, `triggerAt`), ISO timestamp s časovým pásmem. Neplánuje se v Make; rozpoznává ji přímo displej jako v16.5.
-
-`clear_display` maže karty, ne denní log. `clear_current_service_log` maže jen log dne (případně `payload.service_id`). `clear_all_order_logs` vyžaduje `payload.confirm:true`. Kombinované vyčištění je `clear_display_and_current_service_log`. Při ukončení dne nejprve načtěte a uložte správný souhrn a až poté proveďte požadovanou očistu.
+`clear_display` maže karty, ne log. `clear_current_service_log` maže log jednoho dne. `clear_all_order_logs` vyžaduje `confirm:true`.
 
 ## Gesta
 
-`POST /api/action`: `action`, `item_id`, `expected_updated_at`, `expected_status`; u částečného vydání také `served_items`. Akce `toggle_order_completion`, `set_order_item_states`, `complete_reminder`, `swipe_item`.
+`POST /api/action`: `action`, `item_id`, `expected_updated_at`, `expected_status`; u částečného vydání `served_items`. Akce: `toggle_order_completion`, `set_order_item_states`, `complete_reminder`, `swipe_item`.
 
-Úspěch 200 + `{ok:true,result,data}`. Konflikt 409 + `{ok:false,conflict:true,message,data}`. Frontend se vrací k autoritativnímu snapshotu. Ostatní chyby gest 400. Neopakovat automaticky. Optimistická změna nastane okamžitě; serverové časy a start 60s skrývání jsou závazné až po potvrzení. Během zápisu klient nepolluje.
-
-Tap na Upozornění pouze lokálně mute/unmute sirénu; není serverový příkaz. Baterie, fullscreen, wake lock, unlock zvuku a lokální téma rovněž zůstávají místní.
+Konflikt ručního gesta zůstává HTTP 409 s aktuálním snapshotem. Frontend POST automaticky neopakuje. Tap na Upozornění pouze lokálně mute/unmute sirénu a nemění backend.
 
 ## Make
 
-On-demand scénář přijímá `command_json`, předá ho beze změny přes HTTP POST na `/api/command`, vrátí HTTP status a celé tělo odpovědi. Druhý read scénář načítá `/api/display` nebo `/api/log`; výběr cesty je omezený, ne libovolná URL. Skutečná URL se nastavuje až po ověření deploymentu.
+Command Bridge přijímá `command_json` a předává jej beze změny na `/api/command`. Read Bridge načítá `display`, `log` nebo `health`. Make není databáze. Poll displeje a gesta Make nepoužívají.
 
-Používejte `Make.scenario_run` s explicitními vstupy. Nedávejte do tohoto mostu druhý AI model, časový polling, Google Sheet, ani dávkové čekání. Na každou kuchyňskou zprávu ideálně jeden běh; několik souvisejících akcí lze poslat dávkou. Gesta a 3s poll displeje **neprocházejí Make**.
+V17.2 nevyžaduje změnu existujících Make scénářů; `expected_revision` je pouze další pole JSON těla předávaného stávajícím Command Bridge.

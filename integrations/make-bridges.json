@@ -1,8 +1,8 @@
 {
-  "version": "17.0",
+  "version": "17.2",
   "format": "Make.scenario_create arguments, not native Make blueprint",
-  "verifiedAt": "2026-09-05",
-  "note": "Both deployed scenarios are active. Restore copies are deliberately created inactive. Do not duplicate scenarios during ordinary use; inspect existing IDs first.",
+  "verifiedAt": "2026-09-06",
+  "note": "Both deployed scenarios remain unchanged and active for v17.2. Restore copies are deliberately created inactive. Do not duplicate scenarios during ordinary use; inspect existing IDs first.",
   "bridges": [
     {
       "scenarioId": 7256768,

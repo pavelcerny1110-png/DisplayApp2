@@ -19,7 +19,7 @@ test('empty schema and defaults, GET polling does not write', () => {
   const before = db.prepare('SELECT total_changes() n').get().n;
   for (let i = 0; i < 10; i++) {
     const snap = api.snapshot();
-    assert.equal(snap.version, '17.1'); assert.equal(snap.settings.poll_seconds, 3);
+    assert.equal(snap.version, '17.2'); assert.equal(snap.settings.poll_seconds, 3);
     assert.equal(snap.syncState.manualRevision, 0); assert.deepEqual(snap.items, []);
   }
   assert.equal(db.prepare('SELECT total_changes() n').get().n, before);
@@ -197,7 +197,7 @@ test('HTTP endpoints, no-store, CORS, invalid JSON, limits and method rejection'
   res = await handleApi(request('/api/command','POST','{}', { 'Content-Type':'application/json','Content-Length':'99999999' }),api); assert.equal(res.status,413);
   res = await handleApi(request('/api/action','POST',JSON.stringify({ action:'swipe_item',item_id:'missing' }), { 'Content-Type':'application/json' }),api); assert.equal(res.status,409);
   res = await handleApi(request('/api/not-found'),api); assert.equal(res.status,404);
-  res = await handleApi(request('/api/health'),api); assert.equal((await res.json()).version,'17.1');
+  res = await handleApi(request('/api/health'),api); assert.equal((await res.json()).version,'17.2');
 });
 test('100 rapid updates receive distinct expected_updated_at tokens', () => {
   const { api } = createTestKitchen(); add(api); const times = new Set([current(api).updated_at]);
@@ -210,4 +210,156 @@ test('archive/current-state/receipt writes roll back together on storage failure
   store.audit = mutations => { audit(mutations); throw new Error('Simulated disk failure after audit'); };
   const response = add(api);
   assert.equal(response.ok, false); assert.equal(api.snapshot().items.length, 0); assert.equal(api.log().orders.length, 0); assert.equal(api.log().events.length, 0);
+});
+
+test('server assigns operational series numbers and preserves reopened historical numbers', () => {
+  const { api } = createTestKitchen();
+  const create = id => api.commands(command('upsert_item', { item: {
+    id, type: 'order', title: 'client title ignored',
+    data: {
+      order_number: 99,
+      recipient: { type: 'person', value: id.toUpperCase() },
+      order_items: [{ name: 'Jídlo', quantity: 1, pricing_status: 'known', unit_price: 100 }]
+    }
+  }}));
+  const numberOf = id => JSON.parse(current(api, id).data_json).order_number;
+
+  assert.equal(create('a').results[0].result.orderNumber, 1);
+  assert.equal(create('b').results[0].result.orderNumber, 2);
+  assert.equal(current(api, 'a').title, 'Objednávka 1 - A');
+  api.commands(command('complete_order', {}, 'a'));
+  assert.equal(create('c').results[0].result.orderNumber, 3);
+  api.commands(command('complete_order', {}, 'b'));
+  api.commands(command('complete_order', {}, 'c'));
+  assert.equal(create('d').results[0].result.orderNumber, 1);
+
+  // Reopening an older order keeps its historical number even when that creates
+  // two waiting #1 cards; stable IDs remain authoritative for later mutations.
+  api.commands(command('reopen_order', {}, 'a'));
+  assert.equal(numberOf('a'), 1);
+  assert.equal(numberOf('d'), 1);
+  assert.equal(create('e').results[0].result.orderNumber, 2);
+});
+
+test('expected_revision rejects stale new writes before the batch and permits duplicate-only retry', () => {
+  const { api } = createTestKitchen();
+  const first = { ...command('upsert_item', { item: order('one') }), expected_revision: 0 };
+  const accepted = api.commands(first);
+  assert.equal(accepted.ok, true);
+  assert.equal(accepted.data.syncState.revision, 1);
+
+  const stale = { command_id: 'stale-new', action: 'upsert_item', payload: { item: order('two') }, expected_revision: 0 };
+  const conflict = api.commands(stale);
+  assert.equal(conflict.ok, false); assert.equal(conflict.conflict, true);
+  assert.equal(conflict.currentRevision, 1); assert.equal(conflict.data.syncState.revision, 1);
+  assert.equal(current(api, 'two'), undefined);
+
+  // The rejected command_id was never accepted, so it can be rebuilt against
+  // the returned revision and then processed normally.
+  stale.expected_revision = 1;
+  assert.equal(api.commands(stale).results[0].status, 'processed');
+  assert.equal(api.snapshot().syncState.revision, 2);
+
+  // Safe network retry of an already processed ID returns duplicate even though
+  // its original expected revision is now stale.
+  const duplicateRetry = api.commands({ ...stale, expected_revision: 1 });
+  assert.equal(duplicateRetry.ok, true);
+  assert.equal(duplicateRetry.results[0].status, 'duplicate');
+
+  const before = api.snapshot().items.length;
+  const batchConflict = api.commands({
+    expected_revision: 0,
+    commands: [command('upsert_item', { item: order('three') }), command('upsert_item', { item: order('four') })]
+  });
+  assert.equal(batchConflict.conflict, true);
+  assert.equal(api.snapshot().items.length, before);
+});
+
+test('structured order items keep quantity, pricing semantics and order-level override', () => {
+  const { api } = createTestKitchen();
+  const response = api.commands(command('upsert_item', { item: {
+    id: 'structured', type: 'order',
+    data: {
+      recipient: { type: 'table', value: 'T5' },
+      fulfillment: { type: 'box' },
+      order_items: [
+        { name: 'Kuřecí směs', quantity: 2, pricing_status: 'known', price_basis: 'unit', unit_price: 155 },
+        { name: 'Medailonky', quantity: 2, pricing_status: 'known', price_basis: 'total', total_price: 300 },
+        { name: 'Kečup', quantity: 1, pricing_status: 'free' },
+        { name: 'Speciál', quantity: 1, pricing_status: 'unknown' }
+      ]
+    }
+  }}));
+  assert.equal(response.ok, true);
+  const item = current(api, 'structured');
+  const data = JSON.parse(item.data_json);
+  assert.equal(item.title, 'Objednávka 1 - stůl T5');
+  assert.match(item.subtitle, /^Přijato v \d\d:\d\d · stůl T5 · do boxu$/);
+  assert.equal(data.order_items[0].total_price, 310);
+  assert.equal(data.order_items[1].total_price, 300); // explicit total is not multiplied by quantity
+  assert.equal(data.order_items[2].total_price, 0);
+  assert.equal(data.order_items[3].total_price, null);
+  assert.equal(new Set(data.order_items.map(value => value.id)).size, 4);
+  assert.deepEqual(data.pricing, { status: 'unknown', total_price: null, known_subtotal: 610, source: 'calculated' });
+  assert.match(item.body, /2× Kuřecí směs – 310 Kč/);
+  assert.match(item.body, /2× Medailonky – 300 Kč/);
+  assert.match(item.body, /Speciál – cena neznámá/);
+
+  let log = api.log();
+  assert.equal(log.orders[0].pricing_status, 'unknown');
+  assert.equal(log.orders[0].known_subtotal, '610');
+  assert.equal(log.orders[0].total_price, '');
+  assert.equal(log.orders[0].recipient_type, 'table');
+  assert.equal(log.orders[0].recipient_value, 'T5');
+  assert.equal(log.orders[0].fulfillment_type, 'box');
+
+  api.commands(command('patch_item', { data_json_patch: { pricing_override: { status: 'known', total_price: 590 } } }, 'structured'));
+  const overridden = JSON.parse(current(api, 'structured').data_json);
+  assert.deepEqual(overridden.pricing, { status: 'known', total_price: 590, known_subtotal: 590, source: 'override' });
+  log = api.log();
+  assert.equal(log.orders[0].total_price, '590');
+});
+
+test('structured partial serving updates stable item state and price edits preserve that state', () => {
+  const { api } = createTestKitchen();
+  api.commands(command('upsert_item', { item: {
+    id: 'partial-structured', type: 'order',
+    data: { order_items: [
+      { name: 'Vývar', quantity: 3, pricing_status: 'known', price_basis: 'unit', unit_price: 50 },
+      { name: 'Řízek', quantity: 1, pricing_status: 'known', unit_price: 160 }
+    ] }
+  }}));
+  let item = current(api, 'partial-structured');
+  let data = JSON.parse(item.data_json);
+  const firstId = data.order_items[0].id;
+  assert.equal(manual(api, 'set_order_item_states', 'partial-structured', { served_items: [data.pending_items[0]] }).ok, true);
+  item = current(api, 'partial-structured'); data = JSON.parse(item.data_json);
+  assert.equal(data.order_items.find(value => value.id === firstId).status, 'served');
+  assert.equal(item.status, 'waiting');
+  assert.deepEqual(api.log().events.map(value => value.event_type), ['created', 'item_served']);
+
+  const changedItems = structuredClone(data.order_items);
+  changedItems[0].unit_price = 55;
+  changedItems[0].total_price = 165;
+  assert.equal(api.commands(command('patch_item', { data_json_patch: { order_items: changedItems } }, 'partial-structured')).ok, true);
+  item = current(api, 'partial-structured'); data = JSON.parse(item.data_json);
+  assert.equal(data.order_items[0].id, firstId);
+  assert.equal(data.order_items[0].status, 'served');
+  assert.equal(data.order_items[0].total_price, 165);
+  assert.deepEqual(data.served_items, ['Vývar – 165 Kč']);
+  assert.match(item.body, /3× Vývar – 165 Kč/);
+  assert.equal(api.log().events.at(-1).event_type, 'edited');
+});
+
+test('stale expected_revision is HTTP 409 with the current snapshot', async () => {
+  const { api } = createTestKitchen();
+  api.commands({ ...command('upsert_item', { item: order('existing') }), expected_revision: 0 });
+  const request = new Request('https://test.invalid/api/command', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...command('upsert_item', { item: order('stale-http') }), expected_revision: 0 })
+  });
+  const response = await handleApi(request, api);
+  assert.equal(response.status, 409);
+  const body = await response.json();
+  assert.equal(body.conflict, true); assert.equal(body.data.syncState.revision, 1);
 });
