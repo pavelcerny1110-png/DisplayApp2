@@ -1,39 +1,54 @@
-name: Import verified release package
+name: Import verified v17.2 patch
 on:
   push:
-    branches: ['release/**']
-    paths: ['.bootstrap/**']
+    branches: ['release/v17.2']
+    paths: ['.patchbootstrap/READY']
 permissions:
   contents: write
 jobs:
   import:
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Restore exact tested UTF-8 files
+      - name: Restore and verify exact v17.2 source
         run: |
           python - <<'PY'
           from pathlib import Path
           import base64, hashlib, json, lzma
-          root = Path('.bootstrap')
-          manifest = json.loads((root / 'manifest.json').read_text())
+          root = Path('.patchbootstrap')
+          manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
+          assert manifest['base'] == 'b00a4e4d6cd3e270b79bfc156b384e935d4c69ac'
           encoded = ''.join(p.read_text().strip() for p in sorted(root.glob('part*.b64')))
-          archive = base64.b64decode(encoded, validate=True)
-          assert hashlib.sha256(archive).hexdigest() == manifest['archiveSHA256'], 'Transfer checksum mismatch'
-          files = json.loads(lzma.decompress(archive))
-          assert set(files) == set(manifest['files']), 'Incomplete release'
-          for name, text in files.items():
-              path = Path(name)
-              assert not path.is_absolute() and '..' not in path.parts
-              assert path.parts[0] not in ('.git', '.github', '.bootstrap')
-              assert hashlib.sha256(text.encode()).hexdigest() == manifest['files'][name], name
-              path.parent.mkdir(parents=True, exist_ok=True)
-              path.write_text(text, encoding='utf-8')
-          print('Restored and verified', len(files), 'complete source files')
+          packed = base64.b64decode(encoded, validate=True)
+          assert hashlib.sha256(packed).hexdigest() == manifest['patchXZSHA256'], 'Patch transfer checksum mismatch'
+          Path('/tmp/v17.2.patch').write_bytes(lzma.decompress(packed))
+          PY
+          git apply --check /tmp/v17.2.patch
+          git apply /tmp/v17.2.patch
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json
+          manifest = json.loads(Path('.patchbootstrap/manifest.json').read_text(encoding='utf-8'))
+          expected = manifest['files']
+          actual = {}
+          for path in sorted(Path('.').rglob('*')):
+              if not path.is_file() or path.parts[0] in ('.git', '.github', '.patchbootstrap', 'node_modules'):
+                  continue
+              rel = path.as_posix()
+              data = path.read_bytes()
+              data.decode('utf-8')
+              actual[rel] = hashlib.sha256(data).hexdigest()
+          assert set(actual) == set(expected), f'Incomplete release: missing={set(expected)-set(actual)} extra={set(actual)-set(expected)}'
+          for name, digest in expected.items():
+              assert actual[name] == digest, f'Checksum mismatch: {name}'
+          print('Verified', len(actual), 'complete v17.2 source files')
           PY
       - run: npm install --ignore-scripts
       - run: npm test
@@ -44,9 +59,10 @@ jobs:
       - run: node scripts/workerd-smoke.js
       - name: Commit validated full source
         run: |
-          rm -rf .bootstrap
+          rm -rf .patchbootstrap
+          git show b00a4e4d6cd3e270b79bfc156b384e935d4c69ac:.github/workflows/import-release.yml > .github/workflows/import-release.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git commit -m 'Display App v17.0: complete Cloudflare source, verified SQLite runtime and parity tests'
+          git commit -m 'Display App v17.2: server numbering, revision-safe writes and structured orders'
           git push origin "HEAD:${GITHUB_REF_NAME}"
