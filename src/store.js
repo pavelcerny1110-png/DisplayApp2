@@ -2,6 +2,21 @@
 // storage.transactionSync: no awaiting or in-memory authority across requests.
 import { updateOrderArchiveRecord_ } from './engine.js';
 
+const OPERATIONAL_TYPES = new Set(['reminder', 'tip', 'info', 'alert']);
+function parseData(value) {
+  if (!value) return {};
+  if (typeof value === 'object' && !Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch { return {}; }
+}
+function parentOrderId(item) {
+  const data = parseData(item && item.data_json);
+  return String(data.parent_order_id || data.parentOrderId || data.pinned_to_order_id || data.pinnedToOrderId ||
+    data.attached_to_order_id || data.attachedToOrderId || data.order_id || data.orderId || '').trim();
+}
+
 export class KitchenStore {
   constructor(storage) {
     this.storage = storage;
@@ -15,6 +30,10 @@ export class KitchenStore {
       this.sql.exec('CREATE INDEX IF NOT EXISTS events_service ON order_events(service_id, occurred_at)');
       this.sql.exec('CREATE TABLE IF NOT EXISTS commands (command_id TEXT PRIMARY KEY, processed_at TEXT NOT NULL, result_json TEXT NOT NULL)');
       this.sql.exec('CREATE INDEX IF NOT EXISTS commands_time ON commands(processed_at)');
+      // v18 keeps the last complete snapshot of cards attached to each live order.
+      // The snapshot deliberately survives removal from live_items so cancellation
+      // and later history reads cannot lose an instruction that was pinned to it.
+      this.sql.exec('CREATE TABLE IF NOT EXISTS order_attachment_snapshots (order_id TEXT PRIMARY KEY, cards_json TEXT NOT NULL)');
       const schema = this.getMeta('schema_version', 0);
       if (schema > 1) throw new Error('Úložiště má novější schéma; downgrade byl bezpečně odmítnut.');
       if (!schema) this.setMeta('schema_version', 1);
@@ -47,6 +66,25 @@ export class KitchenStore {
       existing.delete(item.id);
     }
     for (const id of existing.keys()) this.sql.exec('DELETE FROM live_items WHERE id = ?', id);
+    this.captureAttachmentSnapshots(items);
+  }
+  captureAttachmentSnapshots(items) {
+    const source = Array.isArray(items) ? items : [];
+    const orders = source.filter(item => String(item && item.type || '').toLowerCase() === 'order');
+    for (const order of orders) {
+      const orderId = String(order.id || '');
+      if (!orderId) continue;
+      const cards = source.filter(item => OPERATIONAL_TYPES.has(String(item && item.type || '').toLowerCase()) && parentOrderId(item) === orderId);
+      this.sql.exec('INSERT INTO order_attachment_snapshots(order_id,cards_json) VALUES (?,?) ON CONFLICT(order_id) DO UPDATE SET cards_json=excluded.cards_json', orderId, JSON.stringify(cards));
+    }
+  }
+  attachmentSnapshot(orderId) {
+    const rows = this.rows('SELECT cards_json FROM order_attachment_snapshots WHERE order_id = ?', String(orderId || ''));
+    if (!rows.length) return [];
+    try {
+      const cards = JSON.parse(rows[0].cards_json);
+      return Array.isArray(cards) ? cards : [];
+    } catch { return []; }
   }
   audit(mutations) {
     for (const mutation of mutations) {
@@ -54,6 +92,9 @@ export class KitchenStore {
         const id = String(update.item.id);
         const prior = this.rows('SELECT record_json FROM order_archive WHERE order_id = ?', id);
         const record = updateOrderArchiveRecord_(prior.length ? JSON.parse(prior[0].record_json) : {}, update);
+        // History needs the full pinned-card snapshot, not just the child IDs kept
+        // for completion undo. The snapshot is read here at the same atomic write.
+        record.attached_cards_json = JSON.stringify(this.attachmentSnapshot(id));
         this.sql.exec('INSERT INTO order_archive(order_id,service_id,received_at,record_json) VALUES (?,?,?,?) ON CONFLICT(order_id) DO UPDATE SET service_id=excluded.service_id,received_at=excluded.received_at,record_json=excluded.record_json', id, record.service_id, record.received_at, JSON.stringify(record));
       }
       for (const event of mutation.events || []) {
@@ -70,10 +111,12 @@ export class KitchenStore {
   clearLog(serviceId) {
     const suffix = serviceId === undefined ? '' : ' WHERE service_id = ?';
     const args = serviceId === undefined ? [] : [serviceId];
+    const orderIds = this.rows('SELECT order_id FROM order_archive' + suffix, ...args).map(row => String(row.order_id || '')).filter(Boolean);
     const clearedArchiveOrders = this.rows('SELECT COUNT(*) AS n FROM order_archive' + suffix, ...args)[0].n;
     const clearedEvents = this.rows('SELECT COUNT(*) AS n FROM order_events' + suffix, ...args)[0].n;
     this.sql.exec('DELETE FROM order_archive' + suffix, ...args);
     this.sql.exec('DELETE FROM order_events' + suffix, ...args);
+    for (const orderId of orderIds) this.sql.exec('DELETE FROM order_attachment_snapshots WHERE order_id = ?', orderId);
     return { clearedArchiveOrders, clearedEvents };
   }
   command(id) {
