@@ -6,7 +6,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-const storage = await mkdtemp(join(tmpdir(), 'display-v17-'));
+const storage = await mkdtemp(join(tmpdir(), 'display-v18-'));
 const base = 'http://127.0.0.1:8788';
 let processHandle;
 let output = '';
@@ -35,12 +35,14 @@ async function request(path,body) {
 }
 try {
   await start();
-  assert.equal((await request('/api/health')).body.version,'17.2');
+  assert.equal((await request('/api/health')).body.version,'18.0');
   const document=await fetch(base+'/');
   assert.equal(document.status,200);
   assert.match(document.headers.get('content-type') || '', /^text\/html;\s*charset=utf-8/i);
   const documentText=await document.text();
   assert.match(documentText,/DISPLAY_APP_VERSION = '17.2'/);
+  assert.match(documentText,/history-v18\.js/);
+  assert.match(documentText,/Display App v18\.0/);
   assert.match(documentText,/<meta charset=\"utf-8\">/i);
   assert.ok(documentText.includes(".replace(/[\\u0300-\\u036f]/g, '')"));
   const command={expected_revision:0,command_id:'ci-create',action:'upsert_item',payload:{item:{id:'ci-order',type:'order',data:{recipient:{type:'table',value:'T5'},order_items:[{name:'Polévka',quantity:2,pricing_status:'known',price_basis:'unit',unit_price:50},{name:'Řízek',quantity:1,pricing_status:'known',unit_price:160}]}}}};
@@ -50,22 +52,31 @@ try {
   assert.equal(created.body.data.items[0].title,'Objednávka 1 - stůl T5');
   assert.equal(JSON.parse(created.body.data.items[0].data_json).pricing.total_price,260);
   assert.equal((await request('/api/command',command)).body.results[0].status,'duplicate');
+  const pinned=await request('/api/command',{expected_revision:1,command_id:'ci-info',action:'upsert_item',payload:{item:{id:'ci-info',type:'info',title:'Informace',body:'Tatarka',data:{parent_order_id:'ci-order'}}}});
+  assert.equal(pinned.body.ok,true);
   const stale=await request('/api/command',{expected_revision:0,command_id:'ci-stale',action:'upsert_item',payload:{item:{id:'should-not-exist',type:'order',body:'X'}}});
   assert.equal(stale.status,409);assert.equal(stale.body.conflict,true);
-  const item=(await request('/api/display')).body.items[0];
+  const item=(await request('/api/display')).body.items.find(value=>value.id==='ci-order');
   const gesture={action:'toggle_order_completion',item_id:item.id,expected_updated_at:item.updated_at,expected_status:item.status};
   const results=await Promise.all([request('/api/action',gesture),request('/api/action',gesture)]);
   assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);
-  const completed=(await request('/api/display')).body.items[0];
+  const completed=(await request('/api/display')).body.items.find(value=>value.id==='ci-order');
   assert.equal(completed.status,'served');
   const logged=(await request('/api/log')).body;
   assert.equal(logged.orders.length,1);
   assert.equal(logged.orders[0].status,'completed');
+  const history=(await request('/api/history')).body;
+  assert.equal(history.version,'18.0');
+  assert.equal(history.orders.length,1);
+  assert.equal(history.orders[0].status,'completed');
+  assert.equal(history.orders[0].attachedCards.length,1);
+  assert.equal(history.orders[0].attachedCards[0].body,'Tatarka');
   await stop();await start();
-  assert.equal((await request('/api/display')).body.items[0].status,'served');
+  assert.equal((await request('/api/display')).body.items.find(value=>value.id==='ci-order').status,'served');
   assert.equal((await request('/api/command',command)).body.results[0].status,'duplicate');
   assert.equal((await request('/api/action',{...gesture,expected_updated_at:completed.updated_at,expected_status:'served'})).body.ok,true);
-  assert.equal((await request('/api/display')).body.items[0].status,'waiting');
-  console.log('PASS actual workerd: assets, SQL, command, dedupe, concurrent conflict, archive, restart, undo');
+  assert.equal((await request('/api/display')).body.items.find(value=>value.id==='ci-order').status,'waiting');
+  assert.equal((await request('/api/history')).body.orders.length,0);
+  console.log('PASS actual workerd v18: assets, SQL, history, pinned cards, command, dedupe, conflict, restart, undo');
 } catch(error) {console.error(output);throw error;}
 finally {await stop();await rm(storage,{recursive:true,force:true});}
