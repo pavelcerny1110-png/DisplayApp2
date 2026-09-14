@@ -36,7 +36,7 @@
     renderCurrentDisplayState();
     const qs = Object.values(state.queues), count = qs.reduce((n, q) => n + q.ops.length, 0), issues = qs.filter(q => q.issue);
     banner.hidden = !count && connectedOnce;
-    banner.textContent = issues.length ? `Počítadla: ${issues.length} změn vyžaduje kontrolu — otevřít` : count ? `Počítadla: ${count} změn čeká na odeslání` : 'Offline — poslední uložený stav';
+    banner.textContent = issues.length ? `Počítadla ke kontrole: ${issues.length} — otevřít` : count ? `Neodeslané změny počítadel: ${count}` : 'Offline — poslední uložený stav';
   }
   function blocked(item) {
     return !ready || document.body.classList.contains('history-mode') || isBatteryWarningActive() || manualActionInFlight.has(item.id) || manualActionInFlight.has(C.data(item).parent_order_id) ||
@@ -110,7 +110,7 @@
     d.append(text('p', q.issue.message), text('p', `Místní hodnota: ${C.value(q)} · Nevyřízené změny: ${q.ops.length}`));
     if (current) d.append(text('p', `Hodnota na serveru: ${C.data(current).value}`));
     const choose = async keep => { try { await transaction(s => C.resolve(s, gen, keep, crypto.randomUUID())); closeDialog(); drain(); } catch (e) { error(e); } };
-    d.append(button('Zavřít', closeDialog), button(current ? 'Ponechat server' : 'Vzít na vědomí', () => choose(false)));
+    d.append(button('Zavřít', closeDialog), button(current ? 'Ponechat hodnotu serveru' : 'Vzít na vědomí', () => choose(false)));
     if (C.writable(current, state.snapshot?.items || [])) d.append(button('Použít místní hodnotu', () => choose(true)));
   }
   function gestures(card, item) {
@@ -149,6 +149,7 @@
     minus.setAttribute('aria-label', 'Odečíst 1'); plus.setAttribute('aria-label', 'Přičíst 1');
     minus.disabled = locked || value === 0; plus.disabled = locked || value >= Number.MAX_SAFE_INTEGER;
     const number = text('output', String(value), 'counter-value'); number.setAttribute('aria-live', 'polite');
+    if (String(value).length > 10) number.style.fontSize = '22px'; else if (String(value).length > 6) number.style.fontSize = '32px';
     row.append(minus, number, plus); node.append(row);
     if (item.body || item.subtitle) node.append(text('p', [item.subtitle, item.body].filter(Boolean).join('\n'), 'counter-description'));
     if (q?.issue) node.append(button('Vyřešit neodeslané změny', () => resolve(C.generation(item))));
@@ -164,7 +165,7 @@
     .counter-title { margin:8px 0 18px; font-size:clamp(23px,3.5vw,38px); overflow-wrap:anywhere; }
     .counter-controls { display:flex; align-items:center; gap:12px; }
     .counter-controls button { flex:0 0 56px; height:56px; font-size:34px; padding:0; }
-    .counter-value { flex:1; min-width:0; text-align:center; font-size:clamp(32px,6vw,72px); font-weight:900; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+    .counter-value { flex:1; min-width:0; text-align:center; font-size:clamp(48px,8vw,72px); font-weight:900; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
     .counter-card button,.counter-dialog button { border:1px solid #b18aff; border-radius:12px; color:inherit; background:#b18aff20; cursor:pointer; min-height:48px; padding:10px 16px; font:inherit; }
     .counter-card button:disabled { opacity:.3; cursor:default; }
     .counter-controls button { font-size:34px; }

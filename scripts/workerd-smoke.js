@@ -71,12 +71,20 @@ try {
   assert.equal(history.orders[0].status,'completed');
   assert.equal(history.orders[0].attachedCards.length,1);
   assert.equal(history.orders[0].attachedCards[0].body,'Tatarka');
+  assert.equal((await request('/api/command',{command_id:'runtime-counter-create',action:'upsert_item',payload:{id:'runtime-counter',type:'counter',title:'Palačinky',data:{value:8}}})).body.ok,true);
+  const counterItem=(await request('/api/display')).body.items.find(item=>item.id==='runtime-counter');
+  const counterStep={action:'counter_delta',item_id:counterItem.id,generation:JSON.parse(counterItem.data_json).counter_generation,operation_id:'runtime-durable-step',delta:1};
+  const steps=await Promise.all([request('/api/action',counterStep),request('/api/action',counterStep)]);
+  assert.ok(steps.every(reply=>reply.body.ok));
+  assert.equal(JSON.parse((await request('/api/display')).body.items.find(item=>item.id===counterItem.id).data_json).value,9);
   await stop();await start();
+  assert.equal((await request('/api/action',counterStep)).body.duplicate,true);
+  assert.equal(JSON.parse((await request('/api/display')).body.items.find(item=>item.id===counterItem.id).data_json).value,9);
   assert.equal((await request('/api/display')).body.items.find(value=>value.id==='ci-order').status,'served');
   assert.equal((await request('/api/command',command)).body.results[0].status,'duplicate');
   assert.equal((await request('/api/action',{...gesture,expected_updated_at:completed.updated_at,expected_status:'served'})).body.ok,true);
   assert.equal((await request('/api/display')).body.items.find(value=>value.id==='ci-order').status,'waiting');
   assert.equal((await request('/api/history')).body.orders.length,0);
-  console.log('PASS actual workerd v18: assets, SQL, history, pinned cards, command, dedupe, conflict, restart, undo');
+  console.log('PASS actual workerd v19: assets, SQL, history, pinned cards, command, durable counter retry, conflict, restart, undo');
 } catch(error) {console.error(output);throw error;}
 finally {await stop();await rm(storage,{recursive:true,force:true});}

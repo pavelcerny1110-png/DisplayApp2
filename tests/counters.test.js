@@ -64,7 +64,16 @@ test('clear and deletion prevent resurrection, including reuse of a card ID', ()
   add(api, { id: 'c', type: 'counter', title: 'Nové počítadlo' });
   assert.notEqual(data(api).counter_generation, pending.generation);
   assert.equal(api.action(pending).code, 'missing'); assert.equal(data(api).value, 0);
-  assert.equal(api.action(op(api, 'counter_delete')).ok, true); assert.equal(api.snapshot().items.length, 0);
+  const deletion = op(api, 'counter_delete');
+  assert.equal(api.action(deletion).ok, true); assert.equal(api.snapshot().items.length, 0);
+  assert.equal(api.action(deletion).ok, true);
+});
+test('counter command retry uses lifetime receipts even after normal command retention expires', () => {
+  const { api, store } = setup(10);
+  const command = { expected_revision: api.snapshot().syncState.revision, command_id:'long-offline-chat-retry', action:'counter_delta', target:'c', payload:{ generation:data(api).counter_generation, delta:2 } };
+  assert.equal(api.commands(command).ok, true);
+  store.sql.exec('DELETE FROM commands');
+  assert.equal(api.commands(command).ok, true); assert.equal(data(api).value, 12);
 });
 test('pinned counter follows the order, locks on terminal state, never leaks into archive or undo', async () => {
   const { api, store } = setup(9, 'o');

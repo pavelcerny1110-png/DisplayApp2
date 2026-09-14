@@ -285,7 +285,7 @@ function patchOneItem_(items, commandTarget, payload, nowIso) {
     throw new Error('payload.data_json_patch musí být objekt.');
   }
   const patch = rawPatch || {};
-  if (items[index].type === 'counter' || patch.type === 'counter') {
+  if (items[index].type === 'counter' || String(patch.type || '').trim().toLowerCase() === 'counter') {
     if (items[index].type !== 'counter' || dataPatch || clearFields.length || Object.keys(patch).some(key => !['title', 'subtitle', 'body', 'sort', 'priority', 'channel'].includes(key))) throw new Error('Počítadlo: patch_item mění pouze název, popis a řazení; hodnotu mění counter_delta/counter_set.');
     if (!counterWritable(items[index], items) || ('title' in patch && !String(patch.title).trim())) throw new Error('Počítadlo je uzamčené nebo nemá platný název.');
   }

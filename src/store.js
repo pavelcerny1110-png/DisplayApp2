@@ -59,6 +59,7 @@ export class KitchenStore {
   items() { return this.rows('SELECT item_json FROM live_items ORDER BY rowid').map(row => JSON.parse(row.item_json)); }
   writeItems(items) {
     const existing = new Map(this.rows('SELECT id,item_json FROM live_items').map(row => [row.id, row.item_json]));
+    const priorCounterGenerations = new Set(Array.from(existing.values()).map(JSON.parse).filter(item => item.type === 'counter').map(item => parseData(item.data_json).counter_generation));
     for (const item of items) {
       const text = JSON.stringify(item);
       if (existing.get(item.id) !== text) {
@@ -71,8 +72,8 @@ export class KitchenStore {
     // Generation UUIDs are never client supplied. Removed generations cannot be
     // resurrected by retries, even if a new card later reuses the same item ID.
     const generations = new Set(items.filter(i => i.type === 'counter').map(i => parseData(i.data_json).counter_generation));
-    for (const row of this.rows('SELECT DISTINCT generation FROM counter_receipts')) {
-      if (!generations.has(row.generation)) this.sql.exec('DELETE FROM counter_receipts WHERE generation = ?', row.generation);
+    for (const generation of priorCounterGenerations) {
+      if (!generations.has(generation)) this.sql.exec('DELETE FROM counter_receipts WHERE generation = ?', generation);
     }
   }
   counterReceipt(generation, operationId) {

@@ -70,9 +70,10 @@ try {
   await launch();
   await until(() => plus('c').isEnabled(), 'counter initialized');
   assert.equal(await page.locator('article[data-item-id="zero"]').getByRole('button',{name:'Odečíst 1'}).isDisabled(), true);
-  await plus('c').dispatchEvent('pointerdown'); await page.waitForTimeout(900); // no auto-repeat
+  const plusBounds = await plus('c').boundingBox();
+  await page.mouse.move(plusBounds.x + 20, plusBounds.y + 20); await page.mouse.down(); await page.waitForTimeout(900); // no auto-repeat
   assert.equal(data('c').value, 10);
-  await plus('c').click(); await until(() => data('c').value === 11, 'one step');
+  await page.mouse.up(); await until(() => data('c').value === 11, 'one step');
   await edit('c', 20, false); assert.equal(data('c').value, 11);
   await edit('c', 20); await until(() => data('c').value === 20, 'absolute save');
   await swipe('zero'); await page.getByRole('dialog').getByRole('button',{name:'Zrušit',exact:true}).click(); assert.ok(counter('zero'));
@@ -93,7 +94,7 @@ try {
   await context.setOffline(true); await edit('c', 40);
   command('counter_delta', {generation:data('c').counter_generation,delta:1}, 'c');
   await context.setOffline(false); await page.evaluate(() => window.dispatchEvent(new Event('online')));
-  await until(async () => (await page.locator('#counterQueueBanner').textContent()).includes('vyžaduje kontrolu'), 'absolute conflict');
+  await until(async () => (await page.locator('#counterQueueBanner').textContent()).includes('ke kontrole'), 'absolute conflict');
   assert.equal(data('c').value, 27);
   await page.locator('#counterQueueBanner').click();
   await page.screenshot({path:'browser-screenshots/19_counter_conflict.png',fullPage:true});
@@ -102,14 +103,14 @@ try {
   await until(() => page.locator('#counterQueueBanner').isHidden(), 'resolution acknowledged');
   await context.setOffline(true); await plus('c').click(); await until(async () => await valueNode('c').textContent() === '41', 'pending deletion recovery');
   command('clear_display'); await context.setOffline(false); await page.evaluate(() => window.dispatchEvent(new Event('online')));
-  await until(async () => (await page.locator('#counterQueueBanner').textContent()).includes('vyžaduje kontrolu'), 'deleted card notice');
+  await until(async () => (await page.locator('#counterQueueBanner').textContent()).includes('ke kontrole'), 'deleted card notice');
   assert.equal(api.snapshot().items.length, 0);
   await page.locator('#counterQueueBanner').click(); assert.match(await page.getByRole('dialog').textContent(), /Místní hodnota: 41/);
   await page.getByRole('dialog').getByRole('button',{name:'Vzít na vědomí'}).click();
   add({id:'o',type:'order',body:'Palačinka'}); add({id:'p',type:'counter',title:'Pro objednávku',data:{parent_order_id:'o'}});
   await page.evaluate(() => refreshDisplay()); await until(() => plus('p').isEnabled(), 'pinned counter');
   command('complete_order', {}, 'o'); await page.evaluate(() => refreshDisplay()); await until(() => plus('p').isDisabled(), 'parent locks counter');
-  await page.setViewportSize({width:915,height:412}); await page.screenshot({path:'browser-screenshots/19_counter_landscape.png',fullPage:true});
+  await page.setViewportSize({width:915,height:412}); await page.waitForTimeout(600); await page.screenshot({path:'browser-screenshots/19_counter_landscape.png',fullPage:true});
   await page.getByRole('button',{name:'Aktuální režim Displej. Klepnutím přepnete do Historie.'}).click();
   await page.locator('.history-order').waitFor(); assert.equal(await page.locator('#historyContent .counter-card').count(), 0);
   assert.doesNotMatch(JSON.stringify(api.log()), /counter_generation/);

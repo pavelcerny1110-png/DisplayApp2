@@ -56,3 +56,12 @@ test('invalid local steps do not alter the durable queue', () => {
   for (const value of [-1, 1.5, '2', Number.MAX_SAFE_INTEGER + 1]) assert.throws(() => enqueue(state, 'counter_set', value, 0));
   assert.deepEqual(state.queues, {});
 });
+test('rebase never displays a negative value or loses the original local recovery target', () => {
+  const { api, state } = setup(1);
+  const first = enqueue(state); enqueue(state, 'counter_delta', -1); enqueue(state, 'counter_delta', -1);
+  api.action({ ...first, operation_id:'other-device-minus', delta:-1 });
+  C.acknowledge(state, first, api.action(first));
+  assert.equal(shown(state), 0); assert.equal(q(state).issue.code, 'range');
+  assert.equal(C.value(q(JSON.parse(JSON.stringify(state)))), 0);
+  assert.equal(C.data(api.snapshot().items[0]).value, 1);
+});

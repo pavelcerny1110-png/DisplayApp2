@@ -40,7 +40,7 @@ function history(api) {
     .filter(record => record && (record.status === 'completed' || record.status === 'cancelled'))
     .map(record => {
       const item = parseObject(record.item_json);
-      const attachedCards = parseArray(record.attached_cards_json).filter(card => card && typeof card === 'object' && !Array.isArray(card));
+      const attachedCards = parseArray(record.attached_cards_json).filter(card => card && typeof card === 'object' && !Array.isArray(card) && String(card.type).toLowerCase() !== 'counter');
       return {
         id: String(record.order_id || item.id || ''),
         orderNumber: Number(record.order_number) || null,

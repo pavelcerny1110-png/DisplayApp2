@@ -9,7 +9,7 @@
   const writable = (item, items) => item?.type === 'counter' && !terminal(item.status) && (!parent(item) || items.some(p => p.id === parent(item) && p.type === 'order' && !terminal(p.status)));
   const integer = value => Number.isSafeInteger(value) && value >= 0;
   const empty = () => ({ schema: 1, snapshot: null, queues: {} });
-  const value = q => q.ops.reduce((n, op) => op.action === 'counter_delta' ? n + op.delta : op.action === 'counter_set' ? op.value : n, data(q.anchor).value);
+  const value = q => q.recoveryValue ?? q.ops.reduce((n, op) => op.action === 'counter_delta' ? n + op.delta : op.action === 'counter_set' ? op.value : n, data(q.anchor).value);
   function accept(state, snapshot) {
     if (snapshot && Array.isArray(snapshot.items) && (!state.snapshot || Number(snapshot.syncState?.revision) >= Number(state.snapshot.syncState?.revision))) state.snapshot = clone(snapshot);
   }
@@ -47,11 +47,20 @@
       q.issue = { code: reply.code || 'invalid', message: reply.message || 'Server změnu odmítl.' };
       return;
     }
+    const localValue = value(q);
     q.ops.shift();
     if (!q.ops.length) { delete state.queues[operation.generation]; return; }
     const anchor = reply.data?.items?.find(i => generation(i) === operation.generation);
-    if (anchor) q.anchor = clone(anchor);
-    else q.issue = { code: 'missing', message: 'Počítadlo bylo odstraněno. Neodeslané změny zůstaly v zařízení.' };
+    if (anchor) {
+      q.anchor = clone(anchor);
+      if (!integer(value(q))) {
+        q.recoveryValue = localValue;
+        q.issue = { code: 'range', message: 'Změny na jiném zařízení by zbývající kroky posunuly mimo povolený rozsah. Vyberte hodnotu, kterou chcete zachovat.' };
+      }
+    } else {
+      q.recoveryValue = localValue;
+      q.issue = { code: 'missing', message: 'Počítadlo bylo odstraněno. Neodeslané změny zůstaly v zařízení.' };
+    }
   }
   function resolve(state, gen, keepLocal, operationId) {
     const q = state.queues[gen];

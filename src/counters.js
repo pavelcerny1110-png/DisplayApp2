@@ -46,7 +46,9 @@ export function mutateCounter(store, items, input, now) {
     return { ...prior.reply, changed: false, duplicate: true };
   }
   const index = items.findIndex(item => item.id === id && item.type === 'counter' && counterData(item).counter_generation === generation);
-  if (index < 0) return { ok: false, conflict: true, code: 'missing', message: 'Počítadlo bylo odstraněno. Neodeslané změny zůstaly v zařízení pro ruční obnovu.' };
+  if (index < 0) return action === 'counter_delete'
+    ? { ok: true, changed: false, result: { operationId, itemId: id, deleted: true, alreadyMissing: true } }
+    : { ok: false, conflict: true, code: 'missing', message: 'Počítadlo bylo odstraněno. Neodeslané změny zůstaly v zařízení pro ruční obnovu.' };
   const item = items[index];
   const data = counterData(item);
   let reply;

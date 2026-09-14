@@ -61,7 +61,8 @@ export class KitchenApi {
     // A stale conditional write is rejected before any new command is accepted.
     // Duplicate-only retries remain readable even with an old revision so a
     // network retry of the same command_id can safely learn its original result.
-    const hasNewCommand = commands.some(command => !this.store.command(command.commandId));
+    const hasNewCommand = commands.some(command => !this.store.command(command.commandId) &&
+      !(counterActions.has(command.action) && this.store.counterReceipt(String(command.payload.generation || ''), command.commandId)));
     const currentRevision = Number(this.store.getMeta('revision', 0));
     if (expectedRevision !== null && hasNewCommand && expectedRevision !== currentRevision) {
       const report = emptyReport();
