@@ -35,14 +35,14 @@ async function request(path,body) {
 }
 try {
   await start();
-  assert.equal((await request('/api/health')).body.version,'18.0');
+  assert.equal((await request('/api/health')).body.version,'19.0');
   const document=await fetch(base+'/');
   assert.equal(document.status,200);
   assert.match(document.headers.get('content-type') || '', /^text\/html;\s*charset=utf-8/i);
   const documentText=await document.text();
-  assert.match(documentText,/DISPLAY_APP_VERSION = '17.2'/);
+  assert.match(documentText,/DISPLAY_APP_VERSION = '19.0'/);
   assert.match(documentText,/history-v18\.js/);
-  assert.match(documentText,/Display App v18\.0/);
+  assert.match(documentText,/Display App v19\.0/);
   assert.match(documentText,/<meta charset=\"utf-8\">/i);
   assert.ok(documentText.includes(".replace(/[\\u0300-\\u036f]/g, '')"));
   const command={expected_revision:0,command_id:'ci-create',action:'upsert_item',payload:{item:{id:'ci-order',type:'order',data:{recipient:{type:'table',value:'T5'},order_items:[{name:'Polévka',quantity:2,pricing_status:'known',price_basis:'unit',unit_price:50},{name:'Řízek',quantity:1,pricing_status:'known',unit_price:160}]}}}};
@@ -66,17 +66,25 @@ try {
   assert.equal(logged.orders.length,1);
   assert.equal(logged.orders[0].status,'completed');
   const history=(await request('/api/history')).body;
-  assert.equal(history.version,'18.0');
+  assert.equal(history.version,'19.0');
   assert.equal(history.orders.length,1);
   assert.equal(history.orders[0].status,'completed');
   assert.equal(history.orders[0].attachedCards.length,1);
   assert.equal(history.orders[0].attachedCards[0].body,'Tatarka');
+  assert.equal((await request('/api/command',{command_id:'runtime-counter-create',action:'upsert_item',payload:{id:'runtime-counter',type:'counter',title:'Palačinky',data:{value:8}}})).body.ok,true);
+  const counterItem=(await request('/api/display')).body.items.find(item=>item.id==='runtime-counter');
+  const counterStep={action:'counter_delta',item_id:counterItem.id,generation:JSON.parse(counterItem.data_json).counter_generation,operation_id:'runtime-durable-step',delta:1};
+  const steps=await Promise.all([request('/api/action',counterStep),request('/api/action',counterStep)]);
+  assert.ok(steps.every(reply=>reply.body.ok));
+  assert.equal(JSON.parse((await request('/api/display')).body.items.find(item=>item.id===counterItem.id).data_json).value,9);
   await stop();await start();
+  assert.equal((await request('/api/action',counterStep)).body.duplicate,true);
+  assert.equal(JSON.parse((await request('/api/display')).body.items.find(item=>item.id===counterItem.id).data_json).value,9);
   assert.equal((await request('/api/display')).body.items.find(value=>value.id==='ci-order').status,'served');
   assert.equal((await request('/api/command',command)).body.results[0].status,'duplicate');
   assert.equal((await request('/api/action',{...gesture,expected_updated_at:completed.updated_at,expected_status:'served'})).body.ok,true);
   assert.equal((await request('/api/display')).body.items.find(value=>value.id==='ci-order').status,'waiting');
   assert.equal((await request('/api/history')).body.orders.length,0);
-  console.log('PASS actual workerd v18: assets, SQL, history, pinned cards, command, dedupe, conflict, restart, undo');
+  console.log('PASS actual workerd v19: assets, SQL, history, pinned cards, command, durable counter retry, conflict, restart, undo');
 } catch(error) {console.error(output);throw error;}
 finally {await stop();await rm(storage,{recursive:true,force:true});}

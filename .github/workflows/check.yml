@@ -21,3 +21,18 @@ jobs:
         env:
           WRANGLER_SEND_METRICS: 'false'
       - run: node scripts/workerd-smoke.js
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/counter-browser-check.js
+      - name: Existing display gesture regressions
+        run: |
+          python3 -m venv /tmp/display-browser-venv
+          /tmp/display-browser-venv/bin/pip install playwright==1.62.0
+          CHROMIUM="$(node -p "require('playwright').chromium.executablePath()")" /tmp/display-browser-venv/bin/python tests/browser_check.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: DisplayApp-v19-browser-checks
+          path: |
+            browser-screenshots/
+            test-results/
+          retention-days: 30

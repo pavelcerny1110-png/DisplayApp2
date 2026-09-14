@@ -4,9 +4,8 @@ import assert from 'node:assert/strict';
 const html = fs.readFileSync('public/index.html','utf8');
 const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
 new vm.Script(script);
-// v18 intentionally preserves the proven v17.2 HTML core and injects its new
-// read-only History layer in the Worker. Keep checking both halves.
-assert.match(html, /const DISPLAY_APP_VERSION = '17\.2'/);
+// Validate the display shell and independently loaded counter/History layers.
+assert.match(html, /const DISPLAY_APP_VERSION = '19\.0'/);
 assert.match(html, /const ALERT_VIEWPORT_PULSE_MS = 10000/);
 assert.match(html, /const REMINDER_VIEWPORT_PULSE_MS = 10000/);
 assert.match(html, /<meta charset=\"utf-8\">/i);
@@ -21,7 +20,7 @@ assert.match(history, /fetch\('\/api\/history'/);
 assert.match(history, /history-received/);
 assert.match(history, /history-terminal/);
 const settings = fs.readFileSync('src/settings.js','utf8');
-assert.match(settings, /VERSION = '18\.0'/);
+assert.match(settings, /VERSION = '19\.0'/);
 const http = fs.readFileSync('src/http.js','utf8');
 assert.match(http, /GET' && path === '\/api\/history'/);
 const worker = fs.readFileSync('src/worker.js','utf8');
@@ -36,4 +35,6 @@ for (const file of fs.readdirSync('src').filter(f=>f.endsWith('.js'))) {
 const config = JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
 assert.equal(config.name,'displayapp2');
 assert.deepEqual(config.migrations[0].new_sqlite_classes,['Kitchen']);
-console.log('v18 frontend layers, history contract and Cloudflare configuration checks passed.');
+console.log('v19 frontend layers, history contract and Cloudflare configuration checks passed.');
+
+for (const name of ['counter-core-v19.js','counter-browser-v19.js','counter-shell-v19.js']) new vm.Script(fs.readFileSync('public/' + name, 'utf8'));

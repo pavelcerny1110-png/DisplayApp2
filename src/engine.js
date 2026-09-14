@@ -1,6 +1,7 @@
 // Display App v17.2. V16.5 command/gesture/audit parity plus server numbering and structured orders.
 // Source SHA-256: d47b90fe0d758cf877a44eb9ef40f6ff2590eba940b6afca7a78fb10eed0bc46
 // No Google APIs, networking or persistence in this module.
+import { initializeCounter, counterWritable } from './counters.js';
 const DISPLAY_TIME_ZONE = 'Europe/Prague';
 const dateFormatter = new Intl.DateTimeFormat('en-GB', {
   timeZone: DISPLAY_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
@@ -198,6 +199,7 @@ function upsertOneItem_(items, source, fallbackId, nowIso, activeChannel, store)
   if (!merged.type) throw new Error('Nová položka musí mít type.');
 
   const type = String(merged.type).trim().toLowerCase();
+  if (existing.type === 'counter' || (type === 'counter' && existingIndex >= 0)) throw new Error('Existující počítadlo upravujte pomocí patch_item nebo counter_delta/counter_set.');
   merged.type = type;
   merged.channel = String(merged.channel || activeChannel || 'main');
   merged.title = String(merged.title || '');
@@ -250,6 +252,7 @@ function upsertOneItem_(items, source, fallbackId, nowIso, activeChannel, store)
     merged.data_json = safeJsonStringify_(orderData);
   }
 
+  if (type === 'counter') initializeCounter(merged, items);
   const normalized = normalizeItemRecord_(merged);
   if (existingIndex >= 0) items[existingIndex] = normalized;
   else items.push(normalized);
@@ -282,6 +285,10 @@ function patchOneItem_(items, commandTarget, payload, nowIso) {
     throw new Error('payload.data_json_patch musí být objekt.');
   }
   const patch = rawPatch || {};
+  if (items[index].type === 'counter' || String(patch.type || '').trim().toLowerCase() === 'counter') {
+    if (items[index].type !== 'counter' || dataPatch || clearFields.length || Object.keys(patch).some(key => !['title', 'subtitle', 'body', 'sort', 'priority', 'channel'].includes(key))) throw new Error('Počítadlo: patch_item mění pouze název, popis a řazení; hodnotu mění counter_delta/counter_set.');
+    if (!counterWritable(items[index], items) || ('title' in patch && !String(patch.title).trim())) throw new Error('Počítadlo je uzamčené nebo nemá platný název.');
+  }
   if (!Object.keys(patch).length && !dataPatch && !clearFields.length) {
     throw new Error('patch_item vyžaduje patch, data_json_patch nebo clear_fields.');
   }
@@ -342,6 +349,7 @@ function setOneItemStatus_(items, commandTarget, payload, nowIso) {
   if (!status) throw new Error('set_status vyžaduje payload.status.');
 
   const type = String(items[index].type || '').toLowerCase();
+  if (type === 'counter') throw new Error('Stav počítadla řídí jeho rodičovská objednávka.');
   if (type === 'order') {
     if (isCompletedLikeStatus_(status) || status === 'served') {
       return completeOrderAtIndex_(items, index, nowIso);
@@ -712,7 +720,7 @@ function attachCardCommand_(items, commandTarget, payload, nowIso) {
   if (!orderSelector) throw new Error('attach_card vyžaduje parent_order_selector nebo parent_order_id.');
 
   const cardIndex = resolveSingleItemIndex_(items, cardSelector, {
-    expectedTypes: ['reminder', 'tip', 'info', 'alert'],
+    expectedTypes: ['reminder', 'tip', 'info', 'alert', 'counter'],
     allowFuzzy: Boolean(payload.allow_fuzzy || payload.allowFuzzy)
   });
   const orderIndex = resolveSingleItemIndex_(items, orderSelector, { expectedTypes: ['order'] });
@@ -720,6 +728,7 @@ function attachCardCommand_(items, commandTarget, payload, nowIso) {
   const card = Object.assign({}, items[cardIndex]);
   const data = parseDataObject_(card.data_json);
   const nextParentId = String(items[orderIndex].id || '');
+  if (card.type === 'counter' && (!counterWritable(card, items) || getMainOrderStatusForAudit_(items[orderIndex].status) !== 'waiting')) throw new Error('Počítadlo lze připnout pouze k čekající objednávce.');
   if (getParentOrderId_(card) === nextParentId) {
     return { changed: false, itemId: card.id, parentOrderId: nextParentId };
   }
@@ -734,11 +743,12 @@ function attachCardCommand_(items, commandTarget, payload, nowIso) {
 function detachCardCommand_(items, commandTarget, payload, nowIso) {
   const selector = payload.selector || payload.target || commandTarget;
   const cardIndex = resolveSingleItemIndex_(items, selector, {
-    expectedTypes: ['reminder', 'tip', 'info', 'alert'],
+    expectedTypes: ['reminder', 'tip', 'info', 'alert', 'counter'],
     allowFuzzy: Boolean(payload.allow_fuzzy || payload.allowFuzzy)
   });
 
   const card = Object.assign({}, items[cardIndex]);
+  if (card.type === 'counter' && !counterWritable(card, items)) throw new Error('Dokončením objednávky se připnuté počítadlo uzamklo.');
   const data = parseDataObject_(card.data_json);
   if (!getParentOrderId_(card)) {
     return { changed: false, itemId: card.id };

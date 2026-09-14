@@ -32,7 +32,7 @@ test('v18 history is current-service, terminal-only and newest-terminal-first', 
   action(api, 'swipe_item', 'cancelled');
 
   const data = await history(api);
-  assert.equal(data.version, '18.0');
+  assert.equal(data.version, '19.0');
   assert.equal(data.serviceId, api.snapshot().syncState.currentServiceId);
   assert.deepEqual(data.orders.map(value => value.id), ['cancelled', 'completed']);
   assert.equal(data.orders[0].status, 'cancelled');

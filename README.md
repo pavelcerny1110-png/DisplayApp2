@@ -1,15 +1,19 @@
-# Display App v17.2
+# Display App v19.0
 
 Kuchyňský objednávkový displej pro ChatGPT, provozovaný na Cloudflare.
 
 **ChatGPT → Make (on-demand) → Worker `/api/command` → SQLite Durable Object `kitchen`.**
-Displej čte `/api/display` každé 3 sekundy; ruční gesta zapisují přímo do `/api/action`. Google Apps Script/Sheets verze je archivní fallback a do běžného provozu v17.2 nezapisuje.
+Displej čte `/api/display` každé 3 sekundy; ruční gesta zapisují přímo do `/api/action`. Historické Google Apps Script/Sheets soubory nejsou produkční backend a neaktivují se.
 
 **Živý displej:** https://displayapp2.pavelcerny1110.workers.dev/
 
 Provozní návod je v [docs/OPERATIONS.md](docs/OPERATIONS.md), API smlouva v [docs/API.md](docs/API.md) a přesná konfigurace Make mostů v [integrations/make-bridges.json](integrations/make-bridges.json).
 
-## v17.2
+## v19.0 — Počítadlo
+
+Samostatná a připnutá počítadla s ±1, zadáním hodnoty podržením, potvrzeným odstraněním a trvalou offline frontou na webu i Androidu. Konflikty vyžadují rozhodnutí obsluhy; počítadla nejsou součástí Historie. [Ovládání a příkazy](docs/COUNTERS_V19.md) · [Vydání v19.0](docs/RELEASE_19_0.md).
+
+## Zachovaný základ v17.2
 
 - **Serverové provozní číslování:** backend přiděluje #1, #2… podle waiting série; completed/cancelled reset neblokují, částečně vydaná objednávka ano. `reopen_order` zachová původní číslo.
 - **Revision guard:** `/api/command` podporuje `expected_revision`. Stará revision vrací HTTP 409 + aktuální snapshot před provedením jakéhokoli nového příkazu z dávky; duplicate-only retry původního command ID zůstává bezpečný.
@@ -54,7 +58,7 @@ node scripts/workerd-smoke.js
 
 `npm test` používá SQLite a zachovává i 36krokový golden test původního v16.5 enginu. Nové testy v17.2 ověřují serverové číslování, revision konflikty, retry deduplikaci, strukturované ceny/položky, příjemce a zachování stavu při opravách. `workerd-smoke.js` testuje skutečný lokální Workers runtime, nikdy produkci.
 
-Volitelné browser testy: `python tests/browser_check.py`. V17.2 nemění rozložení ani ovládání frontendu mimo číslo verze.
+CI spouští také `node tests/counter-browser-check.js` a původní browserová gesta `python tests/browser_check.py`. Testy používají izolovaný backend; nejde o produkční objednávky.
 
 ## Provoz a bezpečnost
 

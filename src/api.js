@@ -1,5 +1,6 @@
 import * as E from './engine.js';
 import { DEFAULT_SETTINGS, VERSION } from './settings.js';
+import { counterActions, mutateCounter } from './counters.js';
 
 const emptyReport = () => ({ processed: 0, errors: [], busy: false });
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -60,7 +61,8 @@ export class KitchenApi {
     // A stale conditional write is rejected before any new command is accepted.
     // Duplicate-only retries remain readable even with an old revision so a
     // network retry of the same command_id can safely learn its original result.
-    const hasNewCommand = commands.some(command => !this.store.command(command.commandId));
+    const hasNewCommand = commands.some(command => !this.store.command(command.commandId) &&
+      !(counterActions.has(command.action) && this.store.counterReceipt(String(command.payload.generation || ''), command.commandId)));
     const currentRevision = Number(this.store.getMeta('revision', 0));
     if (expectedRevision !== null && hasNewCommand && expectedRevision !== currentRevision) {
       const report = emptyReport();
@@ -107,7 +109,12 @@ export class KitchenApi {
           const before = this.store.items();
           const items = E.cloneItems_(before);
           const channel = String(this.store.getMeta('settings', {}).active_channel || DEFAULT_SETTINGS.active_channel);
-          const result = E.applyCommandToItems_(items, command, command.payload, now, channel, this.store);
+          let result;
+          if (counterActions.has(command.action)) {
+            const reply = mutateCounter(this.store, items, { ...command.payload, action: command.action, item_id: command.target || command.payload.item_id, operation_id: command.commandId }, now);
+            if (!reply.ok) throw new Error(reply.message);
+            result = { ...reply.result, changed: reply.changed === true, duplicate: reply.duplicate === true };
+          } else result = E.applyCommandToItems_(items, command, command.payload, now, channel, this.store);
           if (result.changed) this.store.writeItems(items);
           if (!result.skipOrderAudit) {
             this.store.audit([E.deriveOrderAuditMutation_(before, items, {
@@ -138,6 +145,17 @@ export class KitchenApi {
   }
   action(input) {
     if (!isObject(input)) throw new InputError('Požadavek musí být JSON objekt.');
+    if (counterActions.has(input.action)) {
+      try {
+        return this.store.atomic(() => {
+          const items = this.store.items();
+          const now = this.store.nextTimestamp();
+          const reply = mutateCounter(this.store, items, input, now);
+          if (reply.changed) { this.store.writeItems(items); this.store.bumpRevision(now, true); }
+          return { ...reply, busy: false, data: this.snapshot() };
+        });
+      } catch (error) { return { ok: false, code: 'invalid', busy: false, message: messageOf(error), data: this.snapshot() }; }
+    }
     try {
       return this.store.atomic(() => {
         const items = this.store.items();
@@ -146,6 +164,7 @@ export class KitchenApi {
         const conflict = message => ({ ok: false, conflict: true, busy: false, message, data: this.snapshot() });
         if (index < 0) return conflict('Karta už na serveru neexistuje.');
         const current = items[index];
+        if (current.type === 'counter') throw new InputError('Počítadlo vyžaduje vlastní bezpečnou akci counter_delta/counter_set/counter_delete.');
         const expectedAt = String(input.expected_updated_at || input.expectedUpdatedAt || '');
         const expectedStatus = String(input.expected_status || input.expectedStatus || '').toLowerCase();
         if ((expectedAt && current.updated_at !== expectedAt) || (expectedStatus && String(current.status).toLowerCase() !== expectedStatus)) {
