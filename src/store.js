@@ -34,9 +34,10 @@ export class KitchenStore {
       // The snapshot deliberately survives removal from live_items so cancellation
       // and later history reads cannot lose an instruction that was pinned to it.
       this.sql.exec('CREATE TABLE IF NOT EXISTS order_attachment_snapshots (order_id TEXT PRIMARY KEY, cards_json TEXT NOT NULL)');
+      this.sql.exec('CREATE TABLE IF NOT EXISTS counter_receipts (generation TEXT NOT NULL, operation_id TEXT NOT NULL, receipt_json TEXT NOT NULL, PRIMARY KEY(generation, operation_id))');
       const schema = this.getMeta('schema_version', 0);
-      if (schema > 1) throw new Error('Úložiště má novější schéma; downgrade byl bezpečně odmítnut.');
-      if (!schema) this.setMeta('schema_version', 1);
+      if (schema > 2) throw new Error('Úložiště má novější schéma; downgrade byl bezpečně odmítnut.');
+      if (schema < 2) this.setMeta('schema_version', 2);
     });
   }
   atomic(callback) { return this.storage.transactionSync(callback); }
@@ -67,6 +68,19 @@ export class KitchenStore {
     }
     for (const id of existing.keys()) this.sql.exec('DELETE FROM live_items WHERE id = ?', id);
     this.captureAttachmentSnapshots(items);
+    // Generation UUIDs are never client supplied. Removed generations cannot be
+    // resurrected by retries, even if a new card later reuses the same item ID.
+    const generations = new Set(items.filter(i => i.type === 'counter').map(i => parseData(i.data_json).counter_generation));
+    for (const row of this.rows('SELECT DISTINCT generation FROM counter_receipts')) {
+      if (!generations.has(row.generation)) this.sql.exec('DELETE FROM counter_receipts WHERE generation = ?', row.generation);
+    }
+  }
+  counterReceipt(generation, operationId) {
+    const rows = this.rows('SELECT receipt_json FROM counter_receipts WHERE generation = ? AND operation_id = ?', generation, operationId);
+    return rows.length ? JSON.parse(rows[0].receipt_json) : null;
+  }
+  rememberCounterReceipt(generation, operationId, receipt) {
+    this.sql.exec('INSERT INTO counter_receipts(generation,operation_id,receipt_json) VALUES (?,?,?)', generation, operationId, JSON.stringify(receipt));
   }
   captureAttachmentSnapshots(items) {
     const source = Array.isArray(items) ? items : [];

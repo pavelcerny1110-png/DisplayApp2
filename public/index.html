@@ -1414,7 +1414,7 @@
   </div>
 
   <script>
-    const DISPLAY_APP_VERSION = '17.2';
+    const DISPLAY_APP_VERSION = '19.0';
     const DEFAULT_SCREEN_TITLE = `Display App v${DISPLAY_APP_VERSION}`;
     const PRAGUE_TIME_ZONE = 'Europe/Prague';
     const CZECH_LOCALE = 'cs-CZ';
@@ -1444,7 +1444,7 @@
     let wakeLockRequestInFlight = false;
     let wakeLockRetryTimer = null;
 
-    const OPERATIONAL_TYPES = new Set(['reminder', 'tip', 'info', 'alert']);
+    const OPERATIONAL_TYPES = new Set(['reminder', 'tip', 'info', 'alert', 'counter']);
     const ALERT_SIREN_MUTE_STORAGE_KEY = 'displayApp.alertSirenMuted.v1';
     const ALERT_SIREN_MUTED_IDS_STORAGE_KEY = 'displayApp.alertSirenMutedIds.v1';
     const TERMINAL_VISIBILITY_STORAGE_KEY = 'displayApp.terminalVisibilityStarts.v1';
@@ -1590,6 +1590,8 @@
         handleError(new Error('Neplatná odpověď displeje.'));
         return;
       }
+      if (authoritativeData && Number(data.syncState?.revision) < Number(authoritativeData.syncState?.revision)) return;
+      window.counterDisplay?.accept(data);
       authoritativeData = cloneDisplayValue(data);
       consecutivePollErrors = 0;
       setConnectionErrorState(false);
@@ -1607,7 +1609,8 @@
           else byId.set(id, cloneDisplayValue(item));
         });
       });
-      return Array.from(byId.values());
+      const items = Array.from(byId.values());
+      return window.counterDisplay ? window.counterDisplay.project(items) : items;
     }
 
     function isPendingVisualItem(id) {
@@ -1754,6 +1757,7 @@
     }
 
     function sendDisplayAction(action, item, extra = {}) {
+      if (window.counterDisplay?.cached()) { showDisplayActionToast('Nejprve načtěte aktuální stav ze serveru. Offline lze měnit počítadla.'); return; }
       const itemId = String(item && item.id || '');
       if (!itemId || !authoritativeData || manualActionInFlight.has(itemId)) return Promise.resolve({ ok: false, busy: true });
       const currentItems = latestData && Array.isArray(latestData.items) ? latestData.items : [];
@@ -1935,6 +1939,7 @@
         title: dynamicTitle,
         items: visibleItems,
         ringingReminders: getRingingReminderIds(rawItems, displayContext)
+        , counters: window.counterDisplay?.signature()
       });
 
       let contentWasRendered = false;
@@ -2768,6 +2773,7 @@
     }
 
     function createOperationalCard(item, options = {}) {
+      if (canonicalType(item.type) === 'counter' && window.counterDisplay) return window.counterDisplay.card(item, options);
       const type = canonicalType(item.type);
       const data = parseDataJson(item.data_json);
       const displayStatus = options.displayStatus || getOperationalStatus(item.status);
@@ -3914,6 +3920,7 @@
         const id = String(item.id || '');
         if (!id) return;
         const type = canonicalType(item.type);
+        if (type === 'counter') return; // Counter feedback is a quiet local click only.
         if (type !== 'order' && !isOperationalType(type)) return;
         if (isOperationalType(type) && context.declaredParentByChildId.has(id) && !context.parentByChildId.has(id)) return;
 
@@ -5135,6 +5142,7 @@
     function configureManualCardGestures(target, card, item, options = {}) {
       if (!target || !card || !item) return;
       const type = canonicalType(item.type);
+      if (type === 'counter') return; // Counter gestures persist before acknowledgement.
       if (type !== 'order' && !isOperationalType(type)) return;
 
       target.classList.add('manual-gesture-target');

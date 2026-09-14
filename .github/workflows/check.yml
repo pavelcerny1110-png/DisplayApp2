@@ -21,3 +21,11 @@ jobs:
         env:
           WRANGLER_SEND_METRICS: 'false'
       - run: node scripts/workerd-smoke.js
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/counter-browser-check.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: DisplayApp-v19-browser-checks
+          path: browser-screenshots/
+          retention-days: 30

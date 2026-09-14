@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '18.0';
+  const VERSION = '19.0';
   const MODE_DISPLAY = 'display';
   const MODE_HISTORY = 'history';
   const HISTORY_POLL_MS = 3000;
@@ -240,7 +240,7 @@
     card.appendChild(times);
     wrap.appendChild(card);
 
-    const cards = Array.isArray(order.attachedCards) ? order.attachedCards : [];
+    const cards = Array.isArray(order.attachedCards) ? order.attachedCards.filter(card => canonicalType(card.type) !== 'counter') : [];
     if (cards.length) {
       const list = document.createElement('div');
       list.className = 'history-attached-list';

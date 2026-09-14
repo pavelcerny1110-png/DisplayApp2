@@ -1,6 +1,6 @@
 {
   "name": "displayapp2",
-  "version": "18.0.0",
+  "version": "19.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -13,6 +13,7 @@
     "check": "node scripts/check.js"
   },
   "devDependencies": {
+    "playwright": "1.62.1",
     "wrangler": "4.129.0"
   }
 }

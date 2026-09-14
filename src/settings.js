@@ -1,6 +1,6 @@
 // Repository-controlled defaults. Updating this file changes defaults on deploy;
 // redeploying never resets orders, logs, revisions or command deduplication.
-export const VERSION = '18.0';
+export const VERSION = '19.0';
 export const DEFAULT_SETTINGS = Object.freeze({
   theme: 'dark',
   poll_seconds: 3,
